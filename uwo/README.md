@@ -67,7 +67,7 @@ Cell2.nwb
     |--> MEMBRANE RESIST => 310
     |--> INTIAL ACCESS => 13
 ```
-* Note the current implmentation is quite brute force, and goes against the NWB conventions. This need to be eventually replaced*
+* Note the current implementation is quite brute force, and goes against the NWB conventions. This need to be eventually replaced*
 
 
 #### remove sweeps that fail QC
