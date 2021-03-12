@@ -4,7 +4,7 @@
 ## UWO IRG2 Lab conversion
 
 This sub directory consists of scripts utilized to convert data from IRG2 group @ uwo to NWB. Contained here are three scripts adapted heavily from the allen institutes IPFX package.
-as such these scripts are subject to the same  liscence as the IPFX repo.
+as such these scripts are subject to the same license as the IPFX repo.
 
 ### TODO 
 - Documentation
@@ -39,3 +39,36 @@ The script has a number of additional settings. In short you can also specifiy a
 This will add the same metadata to each NWB and does not support specifying metadata for individual NWB's. An example usage might be anonymization the data.
 
 #### Add specific metadata
+The next step is to utilize `run_add_metadata.py`. This script adds additional metadata not yet captured by any other script to the NWB.
+As an input the script should be directed towards the freshly converted NWBS from above. 
+In addition the argument `--metadata` should be directed towards a csv (//TODO JSON) that contains metadata needed for each NWB. The first column of the CSV should contain the file names (without extension) of the NWB's that the data will be added to. The remaining columns should value of the respective key-value pairs to be added to the NWB. The column titles will be used as the key for the data added to the NWB. 
+An example CSV may look like:
+
+```
+| IDS | TEMP | MEMBRANE RESIST | INTIAL ACCESS |
+------------------------------------------------
+| Cell1 | 30 | 300 GIGA OHM    | 10            |
+------------------------------------------------
+| Cell2 | 29 | 310 GIGA OHM    | 13            |
+------------------------------------------------
+```
+
+Which will be added to the NWB as such:
+```
+Cell1.nwb
+-->General
+    |--> TEMP => 30
+    |--> MEMBRANE RESIST => 300 
+    |--> INTIAL ACCESS => 10
+
+Cell2.nwb
+-->General
+    |--> TEMP => 29
+    |--> MEMBRANE RESIST => 310
+    |--> INTIAL ACCESS => 13
+```
+* Note the current implmentation is quite brute force, and goes against the NWB conventions. This need to be eventually replaced*
+
+
+#### remove sweeps that fail QC
+TODO

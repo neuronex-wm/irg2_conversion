@@ -181,8 +181,15 @@ def build_settings(dict):
 
 
 def main():
-    NHPPath = "C:\\Users\\SMest\\Documents\\NHP_MARM\\res"
-    meta_data = pd.read_csv("C:\\Users\\SMest\\Documents\\NHP_MARM\\M17\\Manual_entry_data.csv", index_col=0)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("filesOrFolders", nargs="+",
+                               help="List of NWB to adjust")
+    parser.add_argument("--metadata", default=None,
+                              help="Pointed towards additonal CSV file which contains needed metadata")
+
+
+    NHPPath = args.filesOrFolders
+    meta_data = pd.read_csv(args.metadata, index_col=0)
     protocol = []
     cell_list = meta_data.index.values
     
