@@ -187,18 +187,13 @@ def main():
     parser.add_argument("--metadata", default=None,
                               help="Pointed towards additonal CSV file which contains needed metadata")
 
-
+    args = parser.parse_args()
     NHPPath = args.filesOrFolders
     meta_data = pd.read_csv(args.metadata, index_col=0)
     protocol = []
     cell_list = meta_data.index.values
-    
-    for r, celldir, f in os.walk(NHPPath):
-              
-              for c in celldir: ##Walks through each folder (cell folder) in the root folder
-
-                   c = os.path.join(r, c) ##loads the subdirectory path
-                   shutil.copy("C:\\Users\\SMest\\Documents\\NHP\\default.json",c)
+    for path in NHPPath:
+        for r, celldir, f in os.walk(path):
               for file in f:
                   if '.nwb' in file:
                    try:
