@@ -16,6 +16,7 @@ import time
 import pyperclip
 import pandas as pd
 import collections
+import glob
 from hdmf.utils import docval, popargs
 from pynwb import NWBFile, register_class, load_namespaces, NWBHDF5IO, CORE_NAMESPACE, get_class
 from pynwb.spec import NWBNamespaceBuilder, NWBGroupSpec, NWBAttributeSpec
