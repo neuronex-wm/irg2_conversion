@@ -5,7 +5,7 @@ outputfolder = 'D:\output_MATNWB\'; %[cd, '\'];
 cellList = getCellNames(mainfolder);
 T = readtable([mainfolder, 'manual_entry_data.csv']);
 sessionTag = 'M00';  
-
+filetag = 0;
 
 for n = 1:length(cellList)
     
@@ -66,7 +66,7 @@ for n = 1:length(cellList)
                          'dynamictable', []  ...
                                );     
                            
-     table = table2nwb(T(idx,11:12), 'Anatomical data');  
+     table = table2nwb(T(idx,11:12));  
      anatomy.dynamictable.set('Anatomical data', table);
      nwb.processing.set('Anatomical data', anatomy);
                            
@@ -149,13 +149,38 @@ for n = 1:length(cellList)
             stimOnset = sum(aquiPara.DACEpoch.lEpochInitDuration(1:stimInd-1));
             stimDuration = aquiPara.DACEpoch.lEpochInitDuration(stimInd);
             
+            
+            if sample_int == 100 || sample_int == 50
+                 constantShift = 3126; 
+            elseif sample_int == 200                % shift for input versus response
+               constantShift = 3124*0.5;
+            end
+            
+%             if filetag == 0
+%                LPname = aquiPara.protocolName;
+%                SPname = [];
+%             elseif string(aquiPara.protocolName) ~= string(LPname)  && isempty(SPname)
+%                SPname = aquiPara.protocolName;
+%             end
+            
             for s = 1:size(data,3)
-                stimData = [zeros(1,stimOnset), ...
+                
+%                 if string(aquiPara.protocolName) == string(LPname) || ...
+%                    string(aquiPara.protocolName) == string(SPname)
+%                
+%                     AllenTag(sweepCount,1) = 1;
+%                 else
+%                     AllenTag(sweepCount,1) = 0;
+%                 end
+                
+                stimData = [zeros(1,stimOnset+constantShift), ...
                     ones(1,stimDuration).*(...
                         aquiPara.DACEpoch.fEpochInitLevel(stimInd)+ ...
                           aquiPara.DACEpoch.fEpochLevelInc(stimInd)*s),...
-                             zeros(1,length(data)-stimOnset-stimDuration)]';
+                             zeros(1,length(data)-...
+                             stimOnset-stimDuration-constantShift)]';
 
+                         
                 ccs = types.core.CurrentClampStimulusSeries( ...
                         'electrode', ic_elec_link, ...
                         'gain', NaN, ...
@@ -189,29 +214,35 @@ for n = 1:length(cellList)
                 sweep_series_objects_ch2 = [sweep_series_objects_ch2, sweep_ch2];
                 sweepCount =  sweepCount + 1;   
             end
-            
-            %% Sweep table
-            
-            sweep_nums_vec = [[0:sweepCount-1],[0:sweepCount-1]];
-
-             sweep_nums = types.hdmf_common.VectorData('data', sweep_nums_vec, ...
-                                          'description','sweep numbers');                                     
-            series_ind = types.hdmf_common.VectorIndex(...
-                  'data',  [0:length(sweep_nums_vec)-1],...                                      % 0-based indices to sweep_series_objects
-                   'target', types.untyped.ObjectView('/general/intracellular_ephys/sweep_table/series'));
-            series_data = types.hdmf_common.VectorData(...
-                              'data', [sweep_series_objects_ch1, sweep_series_objects_ch2],...
-                              'description', 'Jagged Array of Patch Clamp Series Objects');
-            sweepTable = types.core.SweepTable(...
-                'colnames', {'series', 'sweep_number'},...
-                'description', 'Sweep table for single electrode aquisitions; traces from current injection are reconstructed',...
-                'id', types.hdmf_common.ElementIdentifiers('data',  [0:length(sweep_nums_vec)-1]),...
-                'series_index', series_ind,...
-                'series', series_data,...
-                'sweep_number', sweep_nums);
-            nwb.general_intracellular_ephys_sweep_table = sweepTable;
+            filetag = filetag + 1;        
         end
     end
+    
+%% Sweep table
+            
+    sweep_nums_vec = [[0:sweepCount-1],[0:sweepCount-1]];
+%    AllenTag_vec = [AllenTag; AllenTag]';
+    
+     sweep_nums = types.hdmf_common.VectorData('data', sweep_nums_vec, ...
+                                  'description','sweep numbers');                                     
+    series_ind = types.hdmf_common.VectorIndex(...
+          'data', [0:length(sweep_nums_vec)-1],...                                      % 0-based indices to sweep_series_objects
+           'target', types.untyped.ObjectView('/general/intracellular_ephys/sweep_table/series'));
+    series_data = types.hdmf_common.VectorData(...
+                      'data', [sweep_series_objects_ch1, sweep_series_objects_ch2],...
+                      'description', 'Jagged Array of Patch Clamp Series Objects');
+
+    sweepTable = types.core.SweepTable(...
+        'colnames', {'series', 'sweep_number', 'Allen_tag'},...
+        'description', 'Sweep table for single electrode aquisitions; traces from current injection are reconstructed',...
+        'id', types.hdmf_common.ElementIdentifiers('data',  [0:length(sweep_nums_vec)-1]),...
+        'series_index', series_ind,...
+        'series', series_data,...
+        'sweep_number', sweep_nums...
+        );
+
+    nwb.general_intracellular_ephys_sweep_table = sweepTable;
+%%    
     sessionTag = cell2mat(T.SubjectID(idx));
     filename = fullfile([outputfolder ,nwb.identifier '.nwb']);
     nwbExport(nwb, filename);
