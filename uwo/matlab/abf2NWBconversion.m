@@ -134,10 +134,18 @@ for n = 1:length(cellList)
               
         elseif ~contains(aquiPara.protocolName, 'noise')  
             
-            if sample_int == 100 || sample_int == 50
+            if sample_int == 100
                  constantShift = 3126; 
             elseif sample_int == 200                % shift for input versus response
                constantShift = 3124*0.5;
+            elseif  sample_int == 50            
+                constantShift = 6268;
+                if sum(fileList(f).name(1:4)=='2018')==4 ...
+                        || sum(fileList(f).name(1:2)=='18')==2 ...
+                        || sum(fileList(f).name(1:4)=='2019')==4 ...
+                        || sum(fileList(f).name(1:2)=='19')==2                    % brutal 
+                    constantShift = 3126;        
+                end               
             end
             
             stimInd = find(aquiPara.DACEpoch.fEpochLevelInc~=0);                
