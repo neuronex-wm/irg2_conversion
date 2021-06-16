@@ -11,6 +11,7 @@ log = logging.getLogger(__name__)
 import pynwb
 import pynput
 import time
+import numpy as np
 
 def main():
     parser = argparse.ArgumentParser()
@@ -43,7 +44,7 @@ def main():
     abf_group.add_argument("--outputFeedbackChannel", action="store_true", default=False,
                         help="Output ADC data to the NWB file which stems from stimulus feedback channels.")
     abf_group.add_argument("--realDataChannel", type=str, action="append",
-                        help=f"Define additional channels which hold non-feedback channel data. The default is {ABFConverter.adcNamesWithRealData}.")
+                        help=f"Define additional channels which hold non-feedback channel data.")
 
     dat_group.add_argument("--multipleGroupsPerFile", action="store_true", default=False,
                            help="Write all Groups from a DAT file into a single NWB file. By default we create one NWB file per Group.")
@@ -59,14 +60,6 @@ def main():
         logger = logging.getLogger()
         logger.setLevel(numeric_level)
 
-    if args.protocolDir:
-        if not os.path.exists(args.protocolDir):
-            raise ValueError("Protocol directory does not exist")
-
-        ABFConverter.protocolStorageDir = args.protocolDir
-
-    if args.realDataChannel:
-        ABFConverter.adcNamesWithRealData.append(args.realDataChannel)
 
     
     root_path = args.filesOrFolders
@@ -86,14 +79,13 @@ def main():
 
                   c = os.path.join(r, c) ##loads the subdirectory path
                   ls = os.listdir(c) ##Lists the files in the subdir
-                  abf_pres = np.any(['.abf' in x for x in ls]) #Looks for the presence of at least one abf file in the folder (does not check subfolders)
+                  abf_pres = np.any(['.cfs' in x for x in ls]) #Looks for the presence of at least one abf file in the folder (does not check subfolders)
                   if abf_pres:
                        if bmeta == True: ##If the user provided an additonal json file, we copy that into the subfolder
                             shutil.copy(meta,c) 
                             
                        print(f"Converting {c}")
-                       nwb = pyCEDFS.CFSconverter(c,
-                                overwrite=True)
+                       nwb = pyCEDFS.CFSConverter(c, outFile=c+'.nwb')
                        if bmeta== True:
                             os.remove(os.path.join(c,os.path.basename(meta)))
 
