@@ -1,7 +1,7 @@
 clear
 
-mainfolder = 'D:\conversion\Old_macaque\'; %fullfile(cd, '\test_cell\');
-outputfolder = 'D:\output_MATNWB\'; %[cd, '\'];
+mainfolder = 'D:\conversion\mouse_reference_data\'; %fullfile(cd, '\test_cell\');
+outputfolder = 'D:\output_NeuroNex_reference\'; %[cd, '\'];
 cellList = getCellNames(mainfolder);
 T = readtable([mainfolder, 'manual_entry_data.csv']);
 sessionTag = 'M00';  
@@ -52,8 +52,10 @@ for n = 1:length(cellList)
                                  'manufacturer', 'Molecular Devices'));     
 
      if noManuTag==0 && cell2mat(T.SlicingSolution(idx))=="Choline"
-       nwb.general_surgery = 'Bioopsies; Anaesthesia; choline-based slicing solution';
+       nwb.general_surgery = 'Bioopsies; Anaesthesia; choline-based slicing solution';     
      end
+     
+     nwb.general_slices = 'ACSF slightly different to NeuroNex better description follows';
      nwb.general_source_script = 'custom matlab script using MATNWB';
      nwb.general_source_script_file_name = mfilename;
      
@@ -71,6 +73,8 @@ for n = 1:length(cellList)
     %% loading the abf files
     paths = fullfile({fileList.folder}, {fileList.name});
     for f = 1:length(fileList)
+        
+        settingsMCC = [];
         [data,sample_int,aquiPara] = abfload(paths{1,f}, ...
             'sweeps','a','channels','a');
     %% Getting start date from 1st recording of cell and checking for new session start 
@@ -95,16 +99,46 @@ for n = 1:length(cellList)
          else
           ic_elec_name = 'unknown'; 
           electOffset = NaN;
-         end 
+        end 
+         
+   %% Assign parameters from settingsMCC
+   if isempty(settingsMCC)
+      filterFreq = 'NA';
+      brigBal = [];
+      holdI = [];
+      capComp = [];
+      PipOffset= [];
+   else
+       filterFreq = num2str(settingsMCC.(['x', ic_elec_name]).GetPrimarySignalLPF);
+       PipOffset = settingsMCC.(['x', ic_elec_name]).GetPipetteOffset;  
+       if settingsMCC.(['x', ic_elec_name]).GetBridgeBalEnable
+          brigBal = settingsMCC.(['x', ic_elec_name]).GetBridgeBalResist;  
+       else
+          brigBal = 0;
+       end
+       if settingsMCC.(['x', ic_elec_name]).GetHoldingEnable
+         holdI = settingsMCC.(['x', ic_elec_name]).GetHolding;
+       else
+         holdI = 0;
+       end
+       if settingsMCC.(['x', ic_elec_name]).GetNeutralizationEnable  
+          capComp = settingsMCC.(['x', ic_elec_name]).GetNeutralizationCap;  
+       else
+          capComp = 0; 
+       end
+       
+   end
+   
    %% Getting run and electrode associated properties  
         device_link = types.untyped.SoftLink(['/general/devices/', device_name]); % lets see if that works
         ic_elec = types.core.IntracellularElectrode( ...
             'device', device_link, ...
             'description', 'Properties of electrode and run associated to it',...
-            'filtering', '10000',...
+            'filtering', filterFreq ,...
             'initial_access_resistance',initAccessResistance,...
-            'location', corticalArea...
-               );
+            'location', corticalArea,...
+            'slice', ['Temperature ', num2str(T.Temperature(idx))]...
+        );
         nwb.general_intracellular_ephys.set(ic_elec_name, ic_elec);
         ic_elec_link = types.untyped.SoftLink(['/general/intracellular_ephys/' ic_elec_name]);       
     %% Data: recreating the stimulus waveform
@@ -115,9 +149,8 @@ for n = 1:length(cellList)
            
             nwb.acquisition.set(['Sweep_', num2str(sweepCount-1)], ...
             types.core.IZeroClampSeries( ...
-                'bias_current', [], ... % Unit: Amp
-                'bridge_balance', [], ... % Unit: Ohm
-                'capacitance_compensation', [], ... % Unit: Farad
+                'bridge_balance', brigBal, ... % Unit: Ohm
+                'capacitance_compensation', capComp, ... % Unit: Farad
                 'data', data, ...
                 'data_unit', 'mV', ...
                 'electrode', ic_elec_link, ...
@@ -149,7 +182,10 @@ for n = 1:length(cellList)
                         || sum(fileList(f).name(1:2)=='21')==2 ...
                         || sum(fileList(f).name(1:4)=='2021')==4 ...
                     constantShift = 3126;        
-                end               
+                end      
+                
+            elseif  sample_int == 20
+                constantShift = 6268;
             end
             
             stimInd = find(aquiPara.DACEpoch.fEpochLevelInc~=0);                
@@ -205,9 +241,9 @@ for n = 1:length(cellList)
 
                 nwb.acquisition.set(['Sweep_', num2str(sweepCount-1)], ...
                     types.core.CurrentClampSeries( ...
-                        'bias_current', [], ... % Unit: Amp
-                        'bridge_balance', [], ... % Unit: Ohm
-                        'capacitance_compensation', [], ... % Unit: Farad
+                        'bias_current', holdI, ... % Unit: Amp
+                        'bridge_balance', brigBal, ... % Unit: Ohm
+                        'capacitance_compensation', capComp, ... % Unit: Farad
                         'data', data(:,1,s), ...
                         'data_unit', aquiPara.recChUnits{:}, ...
                         'electrode', ic_elec_link, ...
