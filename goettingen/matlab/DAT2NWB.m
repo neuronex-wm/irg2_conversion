@@ -6,7 +6,7 @@ fileList = dir(fullfile(mainfolder,'**\*.dat*'));
 CellCounter = 0;
 
 for f = 1:length(fileList)
-    SweepAmp = [];stimOff = []; stimOnset = []; 
+    SweepAmp = [];StimOff = []; StimOn = []; 
     datFile = HEKA_Importer([mainfolder, fileList(f).name]);
     sesstionStart = datetime(datFile.trees.dataTree{1, 1}.RoStartTimeMATLAB);
     posCount = 1;
@@ -41,7 +41,14 @@ for f = 1:length(fileList)
                          datFile.trees.ampTree{1, 1}.RoAmplifierName];        
     nwb.session_start_time = sesstionStart;   
     ic_elec_name = 'Electrode 1';  
-
+    temp_vec = [];
+    dur = duration.empty(height(datFile.RecTable.TimeStamp),0);
+    for i = 1:height(datFile.RecTable.TimeStamp) 
+      dur(i) = datFile.RecTable.TimeStamp{i,1}(...
+         length(datFile.RecTable.TimeStamp{i,1})) - datFile.RecTable.TimeStamp{i,1}(1);   
+      temp_vec(i) = datFile.RecTable.Temperature(i);
+    end
+    Temperature = nansum(temp_vec.*(dur/nansum(dur)));
     %% Getting run and electrode associated properties  
     nwb.general_devices.set(device_name, types.core.Device());
     device_link = types.untyped.SoftLink(['/general/devices/' device_name]);
@@ -51,34 +58,38 @@ for f = 1:length(fileList)
         'filtering', 'unknown',...
         'initial_access_resistance', ...
                   num2str(datFile.RecTable.Rs_uncomp{1,1}{1, 1}(1)/1.0e+06) ,...
-        'location', 'has to be entered manually' ...
-           );
+        'location', 'has to be entered manually', ...
+         'slice', ['Temperature ', num2str(Temperature)]...
+   );
 
     nwb.general_intracellular_ephys.set(ic_elec_name, ic_elec);
     ic_elec_link = types.untyped.SoftLink([ ...
                          '/general/intracellular_ephys/' ic_elec_name]);   
     for e = 1:height(datFile.RecTable)       
-      if contains(datFile.RecTable.Stimulus(e),'Long')
+      if contains(datFile.RecTable.Stimulus(e),'Long') || ...
+              contains(datFile.RecTable.Stimulus(e),'Short')
          for s = 1:datFile.RecTable.nSweeps(e)
              
              stimData = datFile.RecTable.stimWave{e,1}.DA_3(:,s);
              
-             SweepAmp(sweepCount+1,1) = round(1000*mean(nonzeros(stimData(15000:end))));
+             SweepAmp(sweepCount+1,1) = round(1000*mean(nonzeros(stimData(9900:end))));
              
              if SweepAmp(sweepCount+1,1) < 0
-               [~, StimOff(sweepCount+1,1)] = findpeaks(diff(stimData(15000:end)));
-               [~, StimOn(sweepCount+1,1)] = findpeaks(diff(-stimData(15000:end)));
+                [~, temp] = findpeaks(diff(stimData));
+                StimOff(sweepCount+1,1) = temp(length(temp));
+                [~, temp] = findpeaks(diff(-stimData));
+                StimOn(sweepCount+1,1) = temp(length(temp));
              else
-               [~, StimOn(sweepCount+1,1)] = findpeaks(diff(stimData(15000:end)));
-               [~, StimOff(sweepCount+1,1)] = findpeaks(diff(-stimData(15000:end)));
+                [~, temp] = findpeaks(diff(stimData));
+                StimOn(sweepCount+1,1) = temp(length(temp));
+                [~, temp] = findpeaks(diff(-stimData));
+                StimOff(sweepCount+1,1) = temp(length(temp));
              end
-             StimOn(sweepCount+1,1) = StimOn(sweepCount+1,1) + 15000-1;
-             StimOff(sweepCount+1,1) = StimOff(sweepCount+1,1) + 15000-1;
              
              ampState = datFile.trees.ampTree{ampPos(e), 3}.AmAmplifierState;
              t = datFile.RecTable.TimeStamp{e,1}(s);
-             startT = seconds(hours(t.Hour)+ minutes(t.Minute)+seconds(t.Second));
-                                      
+             startT = seconds(hours(t.Hour)+ minutes(t.Minute)+seconds(t.Second));               
+             
              ccs = types.core.CurrentClampStimulusSeries( ...
                     'electrode', ic_elec_link, ...
                     'gain', NaN, ...
@@ -95,7 +106,7 @@ for f = 1:length(fileList)
              nwb.acquisition.set(['Sweep_', num2str(sweepCount)], ...
                   types.core.CurrentClampSeries( ...
                     'bias_current', datFile.RecTable.Vhold{e,1}{1, 2}(s), ... % Unit: Amp
-                    'bridge_balance', datFile.RecTable.Rs{e,1}{1, 2}(s), ... % Unit: Ohm
+                    'bridge_balance', ampState.sRsValue , ... % Unit: Ohm
                     'capacitance_compensation', ampState.sCFastAmp2, ... % Unit: Farad
                     'data', datFile.RecTable.dataRaw{e,1}{1, 2}(:,s), ...
                     'data_unit', cell2mat(datFile.RecTable.ChUnit{2,1}(2)), ...
@@ -154,7 +165,17 @@ for f = 1:length(fileList)
            'description', 'Index of end of stimulus',...
            'data', [[StimOff(~isnan(StimOff))]', [StimOff]']...
               );   
-
+    
+    StimDuration = [];
+    StimDuration = StimOff - StimOn;
+    
+    nwb.general_intracellular_ephys_sweep_table.vectordata.map(...
+        'StimLength') = ...
+          types.hdmf_common.VectorData(...
+           'description', 'Stimulus Length',...
+           'data', [[StimDuration(~isnan(StimDuration))]', [StimDuration]']...
+              );   
+          
       filename = fullfile([outputfolder ,nwb.identifier '.nwb']);
       nwbExport(nwb, filename);
 end
