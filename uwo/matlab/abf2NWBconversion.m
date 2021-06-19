@@ -180,12 +180,13 @@ for n = 1:length(cellList)
                         || sum(fileList(f).name(1:4)=='2019')==4 ...
                         || sum(fileList(f).name(1:2)=='19')==2     ...
                         || sum(fileList(f).name(1:2)=='21')==2 ...
-                        || sum(fileList(f).name(1:4)=='2021')==4 ...
+                        || sum(fileList(f).name(1:4)=='2021')==4
                     constantShift = 3126;        
                 end      
                 
             elseif  sample_int == 20
-                constantShift = 6268;
+                %constantShift = 6268;        %Macaque
+                constantShift = 3126;         %Marm
             end
             
             stimInd = find(aquiPara.DACEpoch.fEpochLevelInc~=0);                
@@ -199,6 +200,8 @@ for n = 1:length(cellList)
                  stimDescrp = 'Long Pulse';             
              elseif stimDuration*(sample_int/1000) == 3
                  stimDescrp = 'Short Pulse';
+             else
+                 disp('hi')
              end
              
 %             if filetag == 0
@@ -312,7 +315,17 @@ for n = 1:length(cellList)
           types.hdmf_common.VectorData(...
            'description', 'Index of end of stimulus',...
            'data', [[stimOff(~isnan(stimOff))]', [stimOff]']...
+              ); 
+          
+    StimDuration = [];
+    StimDuration = stimOff - stimOnset;   
+    nwb.general_intracellular_ephys_sweep_table.vectordata.map(...
+        'StimLength') = ...
+          types.hdmf_common.VectorData(...
+           'description', 'Stimulus Length',...
+           'data', [[StimDuration(~isnan(StimDuration))]', [StimDuration]']...
               );   
+          
 %%    
     sessionTag = cell2mat(T.SubjectID(idx));
     filename = fullfile([outputfolder ,nwb.identifier '.nwb']);
