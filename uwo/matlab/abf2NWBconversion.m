@@ -1,7 +1,7 @@
 clear
 
-mainfolder = 'D:\conversion\mouse_reference_data\'; %fullfile(cd, '\test_cell\');
-outputfolder = 'D:\output_NeuroNex_reference\'; %[cd, '\'];
+mainfolder = 'D:\conversion\Old_macaque\'; %fullfile(cd, '\test_cell\');
+outputfolder = 'D:\output_ressource\'; %[cd, '\'];
 cellList = getCellNames(mainfolder);
 T = readtable([mainfolder, 'manual_entry_data.csv']);
 sessionTag = 'M00';  
@@ -17,7 +17,7 @@ for n = 1:length(cellList)
     noManuTag = 0;
     sweepCount = 1;
     sweep_series_objects_ch1 = []; sweep_series_objects_ch2 = [];
-    SweepAmp = [];stimOff = []; stimOnset = []; 
+    SweepAmp = [];stimOff = []; stimOnset = []; BinaryLP = []; BinarySP = [];
     %% Initializing nwb file and adding first global descriptors
     nwb = NwbFile();
     nwb.identifier = cellList(n,1).name;
@@ -111,7 +111,8 @@ for n = 1:length(cellList)
    else
        filterFreq = num2str(settingsMCC.(['x', ic_elec_name]).GetPrimarySignalLPF);
        PipOffset = settingsMCC.(['x', ic_elec_name]).GetPipetteOffset;  
-       if settingsMCC.(['x', ic_elec_name]).GetBridgeBalEnable
+       if isfield(settingsMCC.(['x', ic_elec_name]),'GetBridgeBalEnable') && ...
+               settingsMCC.(['x', ic_elec_name]).GetBridgeBalEnable
           brigBal = settingsMCC.(['x', ic_elec_name]).GetBridgeBalResist;  
        else
           brigBal = 0;
@@ -121,7 +122,8 @@ for n = 1:length(cellList)
        else
          holdI = 0;
        end
-       if settingsMCC.(['x', ic_elec_name]).GetNeutralizationEnable  
+       if isfield(settingsMCC.(['x', ic_elec_name]),'GetNeutralizationCap') && ...
+               settingsMCC.(['x', ic_elec_name]).GetNeutralizationEnable  
           capComp = settingsMCC.(['x', ic_elec_name]).GetNeutralizationCap;  
        else
           capComp = 0; 
@@ -147,12 +149,13 @@ for n = 1:length(cellList)
         
         if isempty(aquiPara.DACEpoch) && ~contains(aquiPara.protocolName, 'noise')           
            
+
 		     Data_compressed=types.untyped.DataPipe( ...
                   'data', data,...
                   'compressionLevel', 3,...
                   'chunkSize', [1000 1],...
                   'axis', 1);
-				  
+	
             nwb.acquisition.set(['Sweep_', num2str(sweepCount-1)], ...
             types.core.IZeroClampSeries( ...
                 'bridge_balance', brigBal, ... % Unit: Ohm
@@ -203,29 +206,20 @@ for n = 1:length(cellList)
                    stimOnset(sweepCount:size(data,3)+sweepCount-1,1) + stimDuration; 
             
              if  stimDuration*(sample_int/1000) == 1000 
-                 stimDescrp = 'Long Pulse';             
+                 stimDescrp = 'Long Pulse';  
+                 BinaryLP(sweepCount,1)  = 1;
+                 BinarySP(sweepCount,1)  = 0;
              elseif stimDuration*(sample_int/1000) == 3
                  stimDescrp = 'Short Pulse';
+                 BinaryLP(sweepCount,1)  = 0;
+                 BinarySP(sweepCount,1)  = 1;
              else
-                 disp('hi')
+                 disp(['Unknown stimulus type with duration of '...
+                            , num2str(stimDuration*(sample_int/1000)), 'ms'])
              end
              
-%             if filetag == 0
-%                LPname = aquiPara.protocolName;
-%                SPname = [];
-%             elseif string(aquiPara.protocolName) ~= string(LPname)  && isempty(SPname)
-%                SPname = aquiPara.protocolName;
-%             end
-            
             for s = 1:size(data,3)
                 
-%                 if string(aquiPara.protocolName) == string(LPname) || ...
-%                    string(aquiPara.protocolName) == string(SPname)
-%                
-%                     AllenTag(sweepCount,1) = 1;
-%                 else
-%                     AllenTag(sweepCount,1) = 0;
-%                 end
                 SweepAmp(sweepCount,1)  =  aquiPara.DACEpoch.fEpochInitLevel(stimInd)+ ...
                           aquiPara.DACEpoch.fEpochLevelInc(stimInd)*s;
                       
@@ -341,6 +335,19 @@ for n = 1:length(cellList)
           types.hdmf_common.VectorData(...
            'description', 'Stimulus Length',...
            'data', [[StimDuration(~isnan(StimDuration))]', [StimDuration]']...
+              );   
+    nwb.general_intracellular_ephys_sweep_table.vectordata.map(...
+        'BinaryLP') = ...
+          types.hdmf_common.VectorData(...
+           'description', 'Binary tag for sweep being a long pulse protocol',...
+           'data', [[BinaryLP]', [BinaryLP]']...
+              );   
+          
+    nwb.general_intracellular_ephys_sweep_table.vectordata.map(...
+        'BinarySP') = ...
+          types.hdmf_common.VectorData(...
+           'description', 'Binary tag for sweep being a  pulse protocol',...
+           'data',  [[BinarySP]', [BinarySP]']...
               );   
           
 %%    
