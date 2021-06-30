@@ -1,14 +1,39 @@
-clear
+function abf2NWBconversion(varargin)
 
-mainfolder = 'D:\conversion\Old_macaque\'; %fullfile(cd, '\test_cell\');
-outputfolder = 'D:\output_ressource\'; %[cd, '\'];
+%{ 
+Converts all abf files in one folder into one nwb file with the same name
+First input argument is the path to the folder containing folders with abf
+files. Second input argument is the path at which nwb files are saved. If
+only one input argument is used the location is used for both input and
+output.
+%}
+
+
+check = 0;
+
+for v = 1:nargin
+    if check == 0 && (isa(varargin{v}, 'char') || isa(varargin{v}, 'string'))
+        mainfolder = varargin{v};
+        check = 1;
+    elseif (isa(varargin{v}, 'char') || isa(varargin{v}, 'string'))
+        outputfolder = varargin{v};
+        disp('No overwrite mode')
+    end
+end
+
 cellList = getCellNames(mainfolder);
-T = readtable([mainfolder, 'manual_entry_data.csv']);
+if isfile([mainfolder, 'manual_entry_data.csv'])
+  T = readtable([mainfolder, 'manual_entry_data.csv']);
+else
+    error('No manual entry data detected')
+end
 sessionTag = 'M00';  
-filetag = 0;
+
+check = array2table(zeros(length(cellList)*2,3));
+check.Properties.VariableNames = {'sampleInt', 'samples', 'Shift'}; 
+count = 1;
 
 for n = 1:length(cellList)
-    
     cellID = cellList(n).name;
     disp(cellID)  
     fileList = dir([mainfolder,cellList(n,1).name,'/*.abf']);
@@ -65,15 +90,15 @@ for n = 1:length(cellList)
                          'description', 'Histological processing',...
                          'dynamictable', []  ...
                                );     
-                           
-     table = table2nwb(T(idx,11:12));  
+     Col1 = find(strcmpi(T.Properties.VariableNames,'SomaLayerLoc'));
+     Col2 = find(strcmpi(T.Properties.VariableNames,'DendriticType'));
+     table = table2nwb(T(idx, [Col1 Col2]));  
      anatomy.dynamictable.set('Anatomical data', table);
      nwb.processing.set('Anatomical data', anatomy);
                            
     %% loading the abf files
-    paths = fullfile({fileList.folder}, {fileList.name});
+    paths = fullfile({fileList.folder}, {fileList.name});            
     for f = 1:length(fileList)
-        
         settingsMCC = [];
         [data,sample_int,aquiPara] = abfload(paths{1,f}, ...
             'sweeps','a','channels','a');
@@ -127,8 +152,7 @@ for n = 1:length(cellList)
           capComp = settingsMCC.(['x', ic_elec_name]).GetNeutralizationCap;  
        else
           capComp = 0; 
-       end
-       
+       end    
    end
    
    %% Getting run and electrode associated properties  
@@ -149,18 +173,11 @@ for n = 1:length(cellList)
         
         if isempty(aquiPara.DACEpoch) && ~contains(aquiPara.protocolName, 'noise')           
            
-
-		     Data_compressed=types.untyped.DataPipe( ...
-                  'data', data,...
-                  'compressionLevel', 3,...
-                  'chunkSize', [1000 1],...
-                  'axis', 1);
-	
             nwb.acquisition.set(['Sweep_', num2str(sweepCount-1)], ...
             types.core.IZeroClampSeries( ...
                 'bridge_balance', brigBal, ... % Unit: Ohm
                 'capacitance_compensation', capComp, ... % Unit: Farad
-                'data', Data_compressed, ...
+                'data', data, ...
                 'data_unit', 'mV', ...
                 'electrode', ic_elec_link, ...
                 'stimulus_description', stimulus_name,...
@@ -174,9 +191,25 @@ for n = 1:length(cellList)
               SweepAmp(sweepCount,1) = NaN;
               stimOff(sweepCount,1) = NaN;
               stimOnset(sweepCount,1) = NaN;
+              BinaryLP(sweepCount,1)  = NaN;
+              BinarySP(sweepCount,1)  = NaN;
               sweepCount =  sweepCount + 1;   
               
         elseif ~contains(aquiPara.protocolName, 'noise')  
+            stimInd = find(aquiPara.DACEpoch.fEpochLevelInc~=0);   
+            stimDuration = aquiPara.DACEpoch.lEpochInitDuration(stimInd);
+            if  stimDuration*(sample_int/1000) == 1000 
+             stimDescrp = 'Long Pulse';  
+             BinaryLP(sweepCount:size(data,3)+sweepCount-1,1)  = 1;
+             BinarySP(sweepCount:size(data,3)+sweepCount-1,1)  = 0;
+            elseif stimDuration*(sample_int/1000) == 3
+             stimDescrp = 'Short Pulse';
+             BinaryLP(sweepCount:size(data,3)+sweepCount-1,1)  = 0;
+             BinarySP(sweepCount:size(data,3)+sweepCount-1,1)  = 1;
+            else
+             disp(['Unknown stimulus type with duration of '...
+                        , num2str(stimDuration*(sample_int/1000)), 'ms'])
+            end
             
             if sample_int == 100
                  constantShift = 3126; 
@@ -192,73 +225,60 @@ for n = 1:length(cellList)
                         || sum(fileList(f).name(1:4)=='2021')==4
                     constantShift = 3126;        
                 end      
-                
+                if size(data,1) == 2000
+                    constantShift = 31;
+                end
             elseif  sample_int == 20
                 %constantShift = 6268;        %Macaque
                 constantShift = 3126;         %Marm
             end
             
-            stimInd = find(aquiPara.DACEpoch.fEpochLevelInc~=0);                
+           constantShift/size(data,1);   
+
             stimOnset(sweepCount:size(data,3)+sweepCount-1,1) = sum(aquiPara.DACEpoch.lEpochInitDuration(...
                 1:stimInd-1))+constantShift;
-            stimDuration = aquiPara.DACEpoch.lEpochInitDuration(stimInd);
             stimOff(sweepCount:size(data,3)+sweepCount-1,1)  = ...
                    stimOnset(sweepCount:size(data,3)+sweepCount-1,1) + stimDuration; 
             
-             if  stimDuration*(sample_int/1000) == 1000 
-                 stimDescrp = 'Long Pulse';  
-                 BinaryLP(sweepCount,1)  = 1;
-                 BinarySP(sweepCount,1)  = 0;
-             elseif stimDuration*(sample_int/1000) == 3
-                 stimDescrp = 'Short Pulse';
-                 BinaryLP(sweepCount,1)  = 0;
-                 BinarySP(sweepCount,1)  = 1;
-             else
-                 disp(['Unknown stimulus type with duration of '...
-                            , num2str(stimDuration*(sample_int/1000)), 'ms'])
-             end
-             
+            check.StimOn(count) = sum(aquiPara.DACEpoch.lEpochInitDuration(1:stimInd-1));
+            check.StimStart(count) = sum(aquiPara.DACEpoch.lEpochInitDuration(1:stimInd-1))*sample_int/1000;
+            check.sampleInt(count) = sample_int;
+            check.samples(count) = size(data,1);
+            check.Shift(count) = constantShift;
+            check.ID(count) = {cellID};  
             for s = 1:size(data,3)
                 
                 SweepAmp(sweepCount,1)  =  aquiPara.DACEpoch.fEpochInitLevel(stimInd)+ ...
                           aquiPara.DACEpoch.fEpochLevelInc(stimInd)*s;
-                      
+                
+                if  aquiPara.DACEpoch.fEpochLevelInc(stimInd) < 1          % current is in nanoAmp
+                    SweepAmp(sweepCount,1)= SweepAmp(sweepCount,1)*1000;
+                end
+                
                 stimData = [zeros(1,stimOnset(sweepCount,1)), ...
                              ones(1,stimDuration).*SweepAmp(sweepCount,1),...
                                zeros(1,length(data)- ...
                                 stimOnset(sweepCount,1)-stimDuration)]';
-
-                stimData_compressed=types.untyped.DataPipe( ...
-                                   'data', stimData,...
-                                   'compressionLevel', 3,...
-                                   'chunkSize', [1000 1],...
-                                   'axis', 1);
 
 				ccs = types.core.CurrentClampStimulusSeries( ...
                         'electrode', ic_elec_link, ...
                         'gain', NaN, ...
                         'stimulus_description', stimDescrp, ...
                         'data_unit', 'pA', ...
-                        'data', stimData_compressed, ...
+                        'data', stimData, ...
                         'sweep_number', sweepCount,...
                         'starting_time', aquiPara.uFileStartTimeMS/1000,...
                         'starting_time_rate', 1000000/sample_int...
                         );
                     
                 nwb.stimulus_presentation.set(['Sweep_', num2str(sweepCount-1)], ccs);    
-		        
-				Data_compressed=types.untyped.DataPipe( ...
-                  'data', data(:,1,s),...
-                  'compressionLevel', 3,...
-                  'chunkSize', [1000 1],...
-                  'axis', 1);
 
                 nwb.acquisition.set(['Sweep_', num2str(sweepCount-1)], ...
                     types.core.CurrentClampSeries( ...
                         'bias_current', holdI, ... % Unit: Amp
                         'bridge_balance', brigBal, ... % Unit: Ohm
                         'capacitance_compensation', capComp, ... % Unit: Farad
-                        'data', Data_compressed, ...
+                        'data', data(:,1,s), ...
                         'data_unit', aquiPara.recChUnits{:}, ...
                         'electrode', ic_elec_link, ...
                         'stimulus_description', stimDescrp, ...   
@@ -273,8 +293,8 @@ for n = 1:length(cellList)
                 sweep_series_objects_ch2 = [sweep_series_objects_ch2, sweep_ch2];
                 sweepCount =  sweepCount + 1;   
             end
-            filetag = filetag + 1;        
         end
+        count = count +1;
     end
     
 %% Sweep table
@@ -284,9 +304,7 @@ for n = 1:length(cellList)
      sweep_inds_vec = [[sweep_inds_ch2(~isnan(stimOnset))],[sweep_inds_ch2]];
      
      sweep_nums_vec = sweep_inds_vec + 1;
-     
-%    AllenTag_vec = [AllenTag; AllenTag]';
-    
+         
      sweep_nums = types.hdmf_common.VectorData('data', sweep_nums_vec, ...
                                   'description','sweep numbers');                                     
     series_ind = types.hdmf_common.VectorIndex(...
@@ -340,14 +358,14 @@ for n = 1:length(cellList)
         'BinaryLP') = ...
           types.hdmf_common.VectorData(...
            'description', 'Binary tag for sweep being a long pulse protocol',...
-           'data', [[BinaryLP]', [BinaryLP]']...
+           'data', [[BinaryLP(~isnan(BinaryLP))]', [BinaryLP]']...
               );   
           
     nwb.general_intracellular_ephys_sweep_table.vectordata.map(...
         'BinarySP') = ...
           types.hdmf_common.VectorData(...
            'description', 'Binary tag for sweep being a  pulse protocol',...
-           'data',  [[BinarySP]', [BinarySP]']...
+           'data',  [[BinarySP(~isnan(BinarySP))]', [BinarySP]']...
               );   
           
 %%    
