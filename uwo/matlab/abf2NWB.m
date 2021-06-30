@@ -1,4 +1,4 @@
-function abf2NWBconversion(varargin)
+function abf2NWB(varargin)
 
 %{ 
 Converts all abf files in one folder into one nwb file with the same name
@@ -14,16 +14,28 @@ check = 0;
 for v = 1:nargin
     if check == 0 && (isa(varargin{v}, 'char') || isa(varargin{v}, 'string'))
         mainfolder = varargin{v};
+        if endsWith(mainfolder, '\') || endsWith(mainfolder, '/')
+          mainfolder(length(mainfolder)) = [];
+        end
+        cellList = getCellNames(mainfolder);
         check = 1;
     elseif (isa(varargin{v}, 'char') || isa(varargin{v}, 'string'))
         outputfolder = varargin{v};
+        if endsWith(outputfolder, '\') || endsWith(outputfolder, '/')
+          outputfolder(length(outputfolder)) = [];
+        end
         disp('No overwrite mode')
+        for k = 1 : length(cellList)
+          baseFileName = cellList(k).name;
+          fullFileName = fullfile(outputfolder, baseFileName);
+          fprintf(1, 'Now deleting %s\n', fullFileName);
+          delete(fullFileName);
+        end
     end
 end
 
-cellList = getCellNames(mainfolder);
-if isfile([mainfolder, 'manual_entry_data.csv'])
-  T = readtable([mainfolder, 'manual_entry_data.csv']);
+if isfile([mainfolder, '\manual_entry_data.csv'])
+  T = readtable([mainfolder, '\manual_entry_data.csv']);
 else
     error('No manual entry data detected')
 end
@@ -36,7 +48,7 @@ count = 1;
 for n = 1:length(cellList)
     cellID = cellList(n).name;
     disp(cellID)  
-    fileList = dir([mainfolder,cellList(n,1).name,'/*.abf']);
+    fileList = dir([mainfolder,'/',cellList(n,1).name,'/*.abf']);
     %% Initializing variables for Sweep table construction
     
     noManuTag = 0;
@@ -315,7 +327,8 @@ for n = 1:length(cellList)
                       'description', 'Jagged Array of Patch Clamp Series Objects');
 
     sweepTable = types.core.SweepTable(...
-        'colnames', {'series', 'sweep_number', 'Allen_tag'},...
+        'colnames', {'series', 'sweep_number', 'SweepAmp', ...
+                          'StimOn', 'StimOff', 'StimLength', 'BinaryLP', 'BinarySP'},...
         'description', 'Sweep table for single electrode aquisitions; traces from current injection are reconstructed',...
         'id', types.hdmf_common.ElementIdentifiers('data',  [0:length(sweep_nums_vec)-1]),...
         'series_index', series_ind,...
@@ -370,6 +383,6 @@ for n = 1:length(cellList)
           
 %%    
     sessionTag = cell2mat(T.SubjectID(idx));
-    filename = fullfile([outputfolder ,nwb.identifier '.nwb']);
+    filename = fullfile([outputfolder, '/' ,nwb.identifier '.nwb']);
     nwbExport(nwb, filename);
 end    
