@@ -26,7 +26,7 @@ for v = 1:nargin
         end
         disp('No overwrite mode')
         for k = 1 : length(cellList)
-          baseFileName = cellList(k).name;
+          baseFileName = [cellList(k).name, '.nwb'];
           fullFileName = fullfile(outputfolder, baseFileName);
           fprintf(1, 'Now deleting %s\n', fullFileName);
           delete(fullFileName);
