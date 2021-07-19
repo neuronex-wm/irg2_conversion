@@ -74,15 +74,16 @@ for f = 1:length(fileList)
     ic_elec_link = types.untyped.SoftLink([ ...
                          '/general/intracellular_ephys/' ic_elec_name]);   
     for e = 1:height(datFile.RecTable)       
-      if contains(datFile.RecTable.Stimulus(e),'Long') || ...
-              contains(datFile.RecTable.Stimulus(e),'Short')
          for s = 1:datFile.RecTable.nSweeps(e)
              
              stimData = datFile.RecTable.stimWave{e,1}.DA_3(:,s);
              
-             SweepAmp(sweepCount+1,1) = round(1000*mean(nonzeros(stimData(9900:end))));
-             
-             if SweepAmp(sweepCount+1,1) < 0
+             if length(stimData) < 9900
+               SweepAmp(sweepCount+1,1) = round(1000*mean(nonzeros(stimData)));                 
+             else
+               SweepAmp(sweepCount+1,1) = round(1000*mean(nonzeros(stimData(9900:end))));
+             end
+             if SweepAmp(sweepCount+1,1) <= 0
                 [~, temp] = findpeaks(diff(stimData));
                 StimOff(sweepCount+1,1) = temp(length(temp));
                 [~, temp] = findpeaks(diff(-stimData));
@@ -105,7 +106,9 @@ for f = 1:length(fileList)
              BinarySP(sweepCount+1,1)  = 1;
             else
              disp(['Unknown stimulus type with duration of '...
-                        , num2str(stimDuration*(sample_int/1000)), 'ms'])
+                        , num2str(stimDuration/round(datFile.RecTable.SR(e))), 's'])
+             BinaryLP(sweepCount+1,1) = 0;
+             BinarySP(sweepCount+1,1)  = 0;                    
             end
             
              
@@ -146,7 +149,6 @@ for f = 1:length(fileList)
                 sweep_series_objects_ch2 = [sweep_series_objects_ch2, sweep_ch2];
                 sweepCount =  sweepCount + 1;   
          end
-      end
     end
           %% Sweep table
       sweep_nums_vec = [[0:sweepCount-1],[0:sweepCount-1]];
