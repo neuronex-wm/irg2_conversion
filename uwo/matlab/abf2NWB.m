@@ -47,6 +47,7 @@ count = 1;
 
 for n = 1:length(cellList)
     cellID = cellList(n).name;
+    cellID(cellID=='-') = '_';
     disp(cellID)  
     fileList = dir([mainfolder,'/',cellList(n,1).name,'/*.abf']);
     %% Initializing variables for Sweep table construction
@@ -57,7 +58,7 @@ for n = 1:length(cellList)
     SweepAmp = [];stimOff = []; stimOnset = []; BinaryLP = []; BinarySP = [];
     %% Initializing nwb file and adding first global descriptors
     nwb = NwbFile();
-    nwb.identifier = cellList(n,1).name;
+    nwb.identifier = cellID;
     nwb.session_description = ...
       'Characterizing intrinsic biophysical properties of cortical NHP neurons';
     idx = find(strcmp(T.IDS, cellID));
@@ -68,7 +69,7 @@ for n = 1:length(cellList)
       'description', 'NA', 'age', 'NA', ...
       'sex', 'NA', 'species', 'NA');
        corticalArea = 'NA'; 
-       initAccessResistance = 'NA';
+       initAccessResistance = 'NaN';
     else    
       nwb.general_subject = types.core.Subject( ...
         'subject_id', T.SubjectID(idx), 'age', num2str(T.SubjectAge_years(idx)), ...
@@ -321,7 +322,8 @@ for n = 1:length(cellList)
                                   'description','sweep numbers');                                     
     series_ind = types.hdmf_common.VectorIndex(...
           'data', sweep_inds_vec,...                                      % 0-based indices to sweep_series_objects
-           'target', types.untyped.ObjectView('/general/intracellular_ephys/sweep_table/series'));
+           'target', types.untyped.ObjectView('/general/intracellular_ephys/sweep_table/series'), ...
+           'description','sweep index for sweep table');
     series_data = types.hdmf_common.VectorData(...
                       'data', sweeppaths,...
                       'description', 'Jagged Array of Patch Clamp Series Objects');
