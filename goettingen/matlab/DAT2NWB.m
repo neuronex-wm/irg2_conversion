@@ -75,7 +75,7 @@ for f = 1:length(fileList)
                          '/general/intracellular_ephys/' ic_elec_name]);   
     for e = 1:height(datFile.RecTable)       
          for s = 1:datFile.RecTable.nSweeps(e)
-             
+             if ~contains(datFile.RecTable.Stimulus(e), 'sine')
              stimData = datFile.RecTable.stimWave{e,1}.DA_3(:,s);
              
              if length(stimData) < 9900
@@ -148,6 +148,7 @@ for f = 1:length(fileList)
                 sweep_series_objects_ch1 = [sweep_series_objects_ch1, sweep_ch1]; 
                 sweep_series_objects_ch2 = [sweep_series_objects_ch2, sweep_ch2];
                 sweepCount =  sweepCount + 1;   
+             end
          end
     end
           %% Sweep table

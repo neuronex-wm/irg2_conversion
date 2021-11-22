@@ -1,7 +1,7 @@
 clear
 
-mainfolder = 'C:\Users\MFeyerabend\Dropbox\IRG2_reference_data\Pittsburgh'; %fullfile(cd, '\test_cell\');
-outputfolder = 'D:\output_NeuroNex_reference\'; %[cd, '\'];
+mainfolder = 'C:\Users\MFeyerabend\Dropbox\IRG2_reference_data\Goettingen\npi_CED\'; %fullfile(cd, '\test_cell\');
+outputfolder = 'D:\output_NeuroNex_reference\test\'; %[cd, '\'];
 cellList = getCellNames(mainfolder);
 %T = readtable('manual_entry_data.csv');
 sessionTag = 'MXX';
