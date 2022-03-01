@@ -8,9 +8,9 @@ function [nwb, CS] = initNWB(cellList, n, CS)
     CS.PipOffset= []; CS.electOffset = NaN; % both??
     CS.sweep_series_objects_ch1 = []; CS.sweep_series_objects_ch2 = [];
     CS.SweepAmp = []; CS.StimOn = []; CS.StimOff = [];CS.StimDuration = [];
-
+    CS.CompDataIdx = [];
     CS.BinaryLP = []; CS.BinarySP = [];
-    CS.corticalArea = 'NA'; CS.initAccessResistance = NaN;
+    CS.corticalArea = 'NA'; CS.initAccessResistance = 'NA';
     CS.ic_elec_name = 'unknown'; 
           
     nwb = NwbFile( ...

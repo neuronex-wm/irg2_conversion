@@ -237,6 +237,6 @@ for n = 1:length(cellList)
 
    end
   end
-  filename = fullfile([outputfolder , 'Pittsburgh_',nwb.identifier '.nwb']);
+  filename = fullfile(outputfolder , ['Pittsburgh_',nwb.identifier '.nwb']);
   nwbExport(nwb, filename);
 end
