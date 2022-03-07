@@ -7,7 +7,7 @@ function [nwb, CS] = initNWB(cellList, n, CS)
     CS.filterFreq = 'NA'; CS.brigBal = 0; CS.holdI = 0; CS.capComp = 0;
     CS.PipOffset= []; CS.electOffset = NaN; % both??
     CS.sweep_series_objects_ch1 = []; CS.sweep_series_objects_ch2 = [];
-    CS.SweepAmp = []; CS.StimOn = []; CS.StimOff = [];CS.StimDuration = [];
+    CS.SwpAmp = []; CS.StimOn = []; CS.StimOff = [];CS.StimDuration = [];
     CS.CompDataIdx = [];
     CS.BinaryLP = []; CS.BinarySP = [];
     CS.corticalArea = 'NA'; CS.initAccessResistance = 'NA';

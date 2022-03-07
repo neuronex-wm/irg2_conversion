@@ -7,3 +7,4 @@ else
    nwb.session_start_time = CS.sessionStart;
    sessionTag = nwb.general_subject.subject_id;
 end
+end
