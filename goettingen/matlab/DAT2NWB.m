@@ -11,15 +11,21 @@
 % - Protocol vector cell or normal array?
 % - Current amp relative to holding!
 % - Species data
+% - TuneCfast causes problems due to DAC_0 at line 117
 
 clear
 
 mainfolder = uigetdir('','Select main folder'); % select individual folders at start
 outputfolder = uigetdir(mainfolder,'Select output folder');  
 
-fileList = dir(fullfile(mainfolder,'**\*.dat*'));
+%fileList = dir(fullfile(mainfolder,'**\*.dat*')); % With subfolders
+fileList = dir(fullfile(mainfolder,'\*.dat*')); % Without subfolders
 CellCounter = 0;
 deleteList = dir(fullfile(outputfolder,'*Goettingen*.nwb'));
+
+global sname % globals as a way to see if dialog was already run once - if it errors out
+global snumber
+[snumber, name, devID, sname, sage, ssex, sspecies] = miscdesc(); % added this for description of animal and ID generation
 
 for k = 1 : length(deleteList) % loop deletes old converted files in the folder 
   baseFileName = [deleteList(k).name];
@@ -45,29 +51,32 @@ for f = 1:length(fileList)
     end
     CellCounter = CellCounter + 1; % increseas cell counter for the next cell/for loop
     labels = regexp(fileList(f).name, '_', 'split'); % dissects file name but unused so far
-    CellTag = num2str(CellCounter, '%02.f'); % writes internal cell tag & pads single digits with a zero
-    ID = ['Goettingen', '_Heka_Cell', CellTag]; % unique identifier would be helpful - maybe date from labels or ampstate?
-    disp(['New cell found, ID: ', ID]) 
     User = datFile.trees.dataTree{3, 3}.SeUsername; % Extracted from the first recording assuming that one user does all the recordings on one day  
+    CellTag = num2str(CellCounter, '%02.f'); % writes internal cell tag & pads single digits with a zero
+    
+    MATFXID = ['M',snumber,'_',cellfun(@(a) a(1),strsplit(User)), '_A1_C', CellTag,'_']; % ID for MatFX naming convention - needs to be expanded on
+    ID = [MATFXID,'Goettingen', '_', devID,'_Cell', CellTag]; % unique identifier would be helpful - maybe date from labels or ampstate?
+    disp(['New cell found, ID: ', ID])     
     %% Initializing variables for Sweep table construction
     sweepCount = 0;
     sweep_series_objects_ch1 = []; sweep_series_objects_ch2 = [];        
     %% Initializing nwb file and adding first global descriptors
-    nwb = NwbFile('session_description', 'Characterizing intrinsic biophysical properties of cortical neurons', ... project description - should be automated for mice&nhps
+    nwb = NwbFile('session_description', 'A long experiment day', ... project description - should be automated for mice&nhps
         'identifier', ID, ... file name for nwb
         'session_start_time', sessionStart, ... recording date
         'general_experimenter', User,... 
         'general_lab', 'Staiger/Neef', ... maybe unnecessary
+        'general_experiment_description', 'Characterizing intrinsic biophysical properties of cortical NHP neurons.', ...
         'general_institution', 'Institute for Neuroanatomy UMG / CIDBN University of Goettingen'...
         );
      
     disp('Manual entry data not found') % Species data
     %noManuTag = 1;
     nwb.general_subject = types.core.Subject( ...
-        'description', 'NA', ...
-        'age', 'NA', ...
-        'sex', 'NA', ...
-        'species', 'NA' ...
+        'description', sname, ...
+        'age', sage, ...
+        'sex', ssex, ...
+        'species', sspecies ...
     );
     corticalArea = 'NA'; 
 
@@ -105,9 +114,10 @@ for f = 1:length(fileList)
                          '/general/intracellular_ephys/' ic_elec_name]);   
     for e = 1:height(datFile.RecTable)      % number of rows in RecTable = number of recordings 
          for s = 1:datFile.RecTable.nSweeps(e) % goes through each sweep
-             if ~contains(datFile.RecTable.Stimulus(e), 'sine') % used to ignore dynamic gain protocols
-                 stimData = datFile.RecTable.stimWave{e,1}.DA_2(:,s); % stimulus data for each sweep
-
+             if ~contains(datFile.RecTable.Stimulus(e), 'sine') & ~contains(datFile.RecTable.Stimulus(e), 'Tune')  % used to ignore dynamic gain protocols & Tune protocol           
+                
+                 stimData = datFile.RecTable.stimWave{e,1}.DA_2(:,s); % stimulus data for each sweep %% ORIGINAL
+                 
                  if length(stimData) < 9900
                    SweepAmp(sweepCount+1,1) = round(1000*mean(nonzeros(stimData)));  % for short recordings? But at 50 kHz this amounts to about 200 ms - only removes the depol at the beginning               
                  else
@@ -118,7 +128,7 @@ for f = 1:length(fileList)
                     StimOff(sweepCount+1,1) = temp(length(temp));
                     [~, temp] = findpeaks(diff(-stimData));
                     StimOn(sweepCount+1,1) = temp(length(temp));
-                 else
+                 else % It is quite remarkable that this works for the RAMP and probably only because of the way HEKA encodes the Waveform
                     [~, temp] = findpeaks(diff(stimData)); % for positive stimuli, on & off points are flipped pointers
                     StimOn(sweepCount+1,1) = temp(length(temp));
                     [~, temp] = findpeaks(diff(-stimData));
@@ -268,7 +278,7 @@ for f = 1:length(fileList)
     );
 
 % Add Current amplitude as column of stimulus table
-    ic_rec_table.stimuli.colnames = [ic_rec_table.stimuli.colnames {'current_amplitude'}]; % Tell Michael about this!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    ic_rec_table.stimuli.colnames = [ic_rec_table.stimuli.colnames {'current_amplitude'}]; 
     ic_rec_table.stimuli.vectordata.set('current_amplitude', types.hdmf_common.VectorData( ...
         'data', [SweepAmp'], ...
         'description', 'Current amplitude of injected square pulse' ... % relative to holding
