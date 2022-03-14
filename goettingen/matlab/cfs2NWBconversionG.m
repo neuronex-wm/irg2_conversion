@@ -13,9 +13,13 @@ cellList = getCellNames(mainfolder);
 %T = readtable('manual_entry_data.csv');
 sessionTag = 'MXX';
 
-global sname % globals as a way to see if dialog was already run once - if it errors out
-global snumber
-[snumber, name, devID, sname, sage, ssex, sspecies] = miscdesc(); % added this for description of animal and ID generation
+try % doesnt work
+    A = evalin('base','snumber');   
+catch
+    A= 0;
+    [snumber, name, devID, sname, sage, ssex, sspecies] = miscdesc(); % added this for description of animal and ID generation
+end
+
 
 
 
@@ -110,20 +114,21 @@ for n = 1:length(cellList)
          unique(StimOff(sweepCount+1:sweepCount+size(D.data,2))) - ...
           unique(StimOn(sweepCount+1:sweepCount+size(D.data,2)));
        
-       if unique(StimLength(sweepCount+1:sweepCount+size(D.data,2))) == ...
-                round(1/D.param.xScale(2))
+       if round(unique(StimLength(sweepCount+1:sweepCount+size(D.data,2))),-1) == ... % added round because sometimes the ON and OFFSet differ slightly 
+                round(1/D.param.xScale(2)) && ...
+                round(unique(StimLength(sweepCount+1:sweepCount+size(D.data,2))),-1) ~= 20000 % added this to remove the capacitance from falling into LP. It weirdly works otherwise
            stimulus_name = 'Long Pulse' ;  
            BinaryLP(sweepCount+1:sweepCount+size(D.data,2)) = 1;
            BinarySP(sweepCount+1:sweepCount+size(D.data,2)) = 0;
-       elseif unique(StimLength(sweepCount+1:sweepCount+size(D.data,2))) == ...
+       elseif round(unique(StimLength(sweepCount+1:sweepCount+size(D.data,2))),-1) == ...% added round because sometimes the ON and OFFSet differ slightly (like by 1)
                 round(1/D.param.xScale(2))*0.003
            stimulus_name = 'Short Pulse' ;  
            BinaryLP(sweepCount+1:sweepCount+size(D.data,2)) = 0;
            BinarySP(sweepCount+1:sweepCount+size(D.data,2)) = 1;
        else
            disp(['Unknown stimulus type with duration of '... includes ramp problem
-                , unique(StimLength(sweepCount+1:sweepCount+size(D.data,2))/round(1/D.param.xScale(2))), 's'])
-            stimulus_name = 'Unkown'; % added 03.02.2022
+                , num2str(unique(StimLength(sweepCount+1:sweepCount+size(D.data,2))/round(1/D.param.xScale(2)))), ' s'])
+            stimulus_name = 'Unknown'; % added 03.02.2022
            BinaryLP(sweepCount+1:sweepCount+size(D.data,2)) = 0;
            BinarySP(sweepCount+1:sweepCount+size(D.data,2))  = 0;    
 
@@ -177,7 +182,7 @@ for n = 1:length(cellList)
     SweepAmp(isnan(SweepAmp)) = 0;
     
             StimDuration = [];
-            StimDuration = StimOff - StimOn;   
+            StimDuration = StimOff - StimOn;  % Round? 
 
             ic_rec_table = types.core.IntracellularRecordingsTable( ...
                 'categories', {'electrodes', 'stimuli', 'responses'}, ...
