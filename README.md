@@ -11,9 +11,12 @@ The MATLAB code has been developed in MATLAB2020b and requires the MATNWB reposi
 ## Organization
 There is a function converting files for each lab (with their different documentation practices, hardward and so on). So far there is code for:
 
-**1) under \uwo\... MATLAB and python code to convert data obtained at the University of Western Ontario (Martinez and Inoue group): which is for data obtained in Clampex. Optionally, the conversion uses two additional sources of metadata: 
-***1) from the python script mcc_get_settings.py developed from the Allen Brain Insitute. You can find it [here (https://github.com/AllenInstitute/ipfx/tree/master/ipfx/bin). 
-***2) a csv file containing data recorded manually for initial access resistance (read from the membrane test feature of Clampex) and temperature.
+1) under \uwo\... MATLAB and python code to convert data obtained at the University of Western Ontario (Martinez and Inoue group): which is for data obtained in Clampex. Optionally, the conversion uses two additional sources of metadata: 
+        
+        1) from the python script mcc_get_settings.py developed from the Allen Brain Insitute. You can find it [here                         
+           (https://github.com/AllenInstitute/ipfx/tree/master/ipfx/bin). 
+           
+        2) a csv file containing data recorded manually for initial access resistance (read from the membrane test feature of Clampex) and temperature.
 
 **2)  \goettingen\.. contains MATLAB code to convert data obtained from the Neef and Staiger lab: this folder contains code to convert from both dat and cfs format. 
 
