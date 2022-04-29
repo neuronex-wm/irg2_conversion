@@ -31,7 +31,7 @@ for n = 1:length(cellList)
     CS.mainfolder=mainfolder;
     T = table();
     [nwb, CS] = initNWB(cellList, n, CS); 
-    nwb.general_institution = 'University of Goettingen';
+    nwb.general_institution = 'University of Pittsburgh';
     nwb.general_devices.set('Amplifier', ...
           types.core.Device('description', '?????', ...
                                      'manufacturer', 'npi'));                          
@@ -53,9 +53,15 @@ for n = 1:length(cellList)
     %% Data: recreating the stimulus waveform
      CS = GetStimulusEpoch(D.data(:,:,2), CS, D.param.xScale);       
      for s = 1:size(D.data,2) % looping through sweeps
-                
+      
+      CS.holdingI(CS.swpCt) = mode(round(D.data(1:CS.StimOn(...
+                                                        CS.swpCt),s,2),1));
+      if CS.holdingI(CS.swpCt)<0
+          disp("hi")
+      end
       CS.SwpAmp(CS.swpCt) = round(mean(D.data(CS.StimOn(CS.swpCt)...
-                                       :CS.StimOff(CS.swpCt),s,2)),-1);
+                                       :CS.StimOff(CS.swpCt),s,2))-...
+                                       CS.holdingI(CS.swpCt),-1);
                 
       ccs = types.core.CurrentClampStimulusSeries( ...
                         'electrode', ICelecLink, ...
@@ -71,7 +77,7 @@ for n = 1:length(cellList)
      nwb.stimulus_presentation.set(['Sweep_', num2str(CS.swpCt-1)], ccs);    
                 
      nwb.acquisition.set(['Sweep_', num2str(CS.swpCt-1)], types.core.CurrentClampSeries( ...
-                        'bias_current', [], ... % Unit: Amp
+                        'bias_current', CS.holdingI(CS.swpCt), ... % Unit: Amp
                         'bridge_balance', [], ... % Unit: Ohm
                         'capacitance_compensation', [], ... % Unit: Farad
                         'data', D.data(:,s,1), ...
@@ -93,6 +99,6 @@ for n = 1:length(cellList)
      end    % end of sweep loop 
   end     % end of file loop
   nwb = makeICtab(nwb, CS, ic_elec); 
-  filename = fullfile([outputfolder , 'Pittsburgh_',nwb.identifier '.nwb']);
+  filename = fullfile(outputfolder , ['Pittsburgh_',nwb.identifier '.nwb']);
   nwbExport(nwb, filename);
 end% end of cell loop
