@@ -1,25 +1,45 @@
-function [CS] = GetStimulusEpoch(data, CS, xScl)
-input = mean(data,2);
-[~, posPeak] = findpeaks(diff(input), 'NPeaks', 1,'SortStr', 'descend');
-[~, negPeak] = findpeaks(-diff(input), 'NPeaks', 1,'SortStr', 'descend');
-if length(posPeak) > 1
-    StimOn = posPeak(2);
-    StimOff = negPeak(2);
+function [StimOn,StimOff] = GetStimulusEpoch(input)
+
+[n, bins] =  hist(round(input(10000:end),-1), unique(round(input(10000:end),-1)));
+[~,idx] = sort(-n);
+values = bins(idx);
+if values(2) > 0  
+    [~, posPeak] = findpeaks(diff(input), 'MinPeakHeight', 2); % changed this to MinPeakHeight because otherwise it didnt work for more files
+    [~, negPeak] = findpeaks(-diff(input), 'MinPeakHeight', 2);
 else
-    StimOn = posPeak;
-    StimOff = negPeak;
+%     [~, posPeak] = findpeaks(-diff(input),'SortStr','descend','NPeaks',2);
+%     [~, negPeak] = findpeaks(diff(input),'SortStr','descend','NPeaks',2);
+      [~, posPeak] = findpeaks(-diff(input), 'MinPeakHeight', 1);
+      [~, negPeak] = findpeaks(diff(input), 'MinPeakHeight', 1);
 end
-CS.StimOn(CS.swpCt:CS.swpCt-1+size(data,2)) = StimOn;
-CS.StimOff(CS.swpCt:CS.swpCt-1+size(data,2)) = StimOff;       
-CS.StimDuration(CS.swpCt:CS.swpCt-1+size(data,2)) = ...
-              unique(CS.StimOff(CS.swpCt:CS.swpCt-1+size(data,2))) - ...
-                           CS.StimOn(CS.swpCt:CS.swpCt-1+size(data,2));
-if CS.StimDuration(CS.swpCt:CS.swpCt-1+size(data,2)) > round(0.49/xScl(2))
-   CS.stimulus_name = 'Long Pulse' ;  
-   CS.BinaryLP(CS.swpCt:CS.swpCt+size(data,2)-1) = 1;
-   CS.BinarySP(CS.swpCt:CS.swpCt+size(data,2)-1) = 0;
-elseif CS.StimDuration(CS.swpCt:CS.swpCt-1+size(data,2)) == round(1/xScl(2)*0.003)
-   CS.stimulus_name = 'Short Pulse' ;  
-   CS.BinaryLP(CS.swpCt:CS.swpCt+size(data,2)-1) = 0;
-   CS.BinarySP(CS.swpCt:CS.swpCt+size(data,2)-1) = 1;
-end        
+if negPeak(end) >=80000 || posPeak(end)  >=80000 % loop for ramp with variable endpoint 
+    Changepoints = find(ischange(input,'linear','Threshold',100000)~=0); % contains all stim on and offs - quite close to findpeaks points
+    if length(Changepoints) == 2
+        StimOn = Changepoints(1); % 3rd one is ramp onset
+        StimOff = Changepoints(2); % 4th one usually off
+        disp(['Changepoints length ', num2str(length(Changepoints))])
+    else
+        StimOn = Changepoints(3); % 3rd one is ramp onset
+        StimOff = Changepoints(4); % 4th one usually off
+        disp(['Changepoints length ', num2str(length(Changepoints))])
+    end
+else
+    if length(posPeak) > 1
+        if posPeak(2) > negPeak(2)
+            StimOn = negPeak(2);
+            StimOff = posPeak(2);  
+        else
+            StimOn = posPeak(2);
+            StimOff = negPeak(2);
+        end
+    else
+        if posPeak > negPeak % Cap compensation recording
+            StimOn = negPeak;
+            StimOff = posPeak;
+        else
+            StimOn = posPeak;
+            StimOff = negPeak;
+        end
+    end
+end
+end

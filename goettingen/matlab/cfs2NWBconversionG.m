@@ -1,26 +1,49 @@
+% modified for nwb 2.4.0
+% ongoing issues Dec. 2021:
+% - Check the thing with the ones (line 96)
+
 clear
 
-mainfolder = 'C:\Users\MFeyerabend\Dropbox\IRG2_reference_data\Goettingen\npi_CED\'; %fullfile(cd, '\test_cell\');
-outputfolder = 'D:\output_NeuroNex_reference\test\'; %[cd, '\'];
+
+
+mainfolder = uigetdir('','Select main folder containing all cell folders'); % select individual folders at start
+outputfolder = uigetdir(mainfolder,'Select output folder'); 
+
 cellList = getCellNames(mainfolder);
 %T = readtable('manual_entry_data.csv');
 sessionTag = 'MXX';
+
+try % doesnt work
+    A = evalin('base','snumber');   
+catch
+    A= 0;
+    [snumber, name, devID, sname, sage, ssex, sspecies] = miscdesc(); % added this for description of animal and ID generation
+end
+
+
+
 
 for n = 1:length(cellList)
     cellID = cellList(n).name;
     disp(cellID)  
     fileList = dir([mainfolder,'/',cellList(n,1).name,'/*.mat']);
-  
+    CellCounter = n;
+    CellTag = num2str(CellCounter, '%02.f');
+    MATFXID = ['M',snumber,'_',name, '_A1_C', CellTag,'_']; % ID for MatFX naming convention - needs to be expanded on
+    ID = [MATFXID,'Goettingen', '_',devID,'_Cell', CellTag];
     %% Initializing variables for Sweep table construction
     sweepCount = 0;
     sweep_series_objects_ch1 = []; sweep_series_objects_ch2 = [];
     SweepAmp = [];StimOff = []; StimOn = []; BinaryLP = []; BinarySP = [];
 
     %% Initializing nwb file and adding first global descriptors
-    nwb = NwbFile();
-    nwb.identifier = cellList(n,1).name;
-    nwb.session_description = ...
-      'Characterizing intrinsic biophysical properties of cortical NHP neurons';
+    nwb = NwbFile(...
+        'identifier', ID, ...
+        'general_lab', 'Jochen Staiger', ...
+        'general_institution', 'Institute for Neuroanatomy UMG', ...
+        'general_experiment_description', 'Characterizing intrinsic biophysical properties of cortical NHP neurons.', ...
+        'session_description', 'One experiment day' ...
+    );
     %idx = find(strcmp(T.IDS, cellID));
 %     if isempty(idx)
 %         disp('Manual entry data not found')
@@ -32,9 +55,19 @@ for n = 1:length(cellList)
 %         'description', T.SubjectID(idx), 'age', num2str(T.SubjectAge(idx)), ...
 %         'sex', T.SubjectSex(idx), 'species', T.SubjectBreed(idx));
 %     end
-     nwb.general_institution = 'University of Goettingen';
-     device_name = 'CED digitizer XXXX; Amplifier: Axon MultiClamp 700B';  % @Stefan: hier bitte die richtigen 
+    device_name = 'CED digitizer Power 1401 mkII; Amplifier: SEC-05X';  % @Stefan: hier bitte die richtigen 
 
+    disp('Manual entry data not found') % Species data
+    %noManuTag = 1;
+    nwb.general_subject = types.core.Subject( ...
+        'description', sname, ...
+        'age', sage, ...
+        'sex', ssex, ...
+        'species', sspecies ...
+    );
+
+    corticalArea = 'NA'; % Location place holder
+     
     %% loading the matlab converted cfs files
     paths = fullfile({fileList.folder}, {fileList.name});
     for f = 1:length(fileList)
@@ -66,8 +99,8 @@ for n = 1:length(cellList)
             'description', 'Properties of electrode and run associated to it',...
             'filtering', 'unknown',...
             'initial_access_resistance', 'has to be entered manually',...
-            'location', 'has to be entered manually' ...
-               );
+            'location', corticalArea ...
+         );
         nwb.general_intracellular_ephys.set(ic_elec_name, ic_elec);
         ic_elec_link = types.untyped.SoftLink(['/general/intracellular_ephys/' ic_elec_name]);     
         
@@ -75,20 +108,30 @@ for n = 1:length(cellList)
        [On,Off] = GetStimulusEpoch(mean(D.data(:,:,2),2));
        StimOn(sweepCount+1:sweepCount+size(D.data,2)) = On*ones(size(D.data,2),1);
        StimOff(sweepCount+1:sweepCount+size(D.data,2)) = Off*ones(size(D.data,2),1);       
+%        StimOn(sweepCount+1:sweepCount+size(D.data,2)) = On; % This should work just as well as the other way - ASK MICHAEL WHY THIS IS IMPLEMENTED
+%        StimOff(sweepCount+1:sweepCount+size(D.data,2)) = Off;  
        StimLength(sweepCount+1:sweepCount+size(D.data,2)) = ...
          unique(StimOff(sweepCount+1:sweepCount+size(D.data,2))) - ...
           unique(StimOn(sweepCount+1:sweepCount+size(D.data,2)));
        
-       if unique(StimLength(sweepCount+1:sweepCount+size(D.data,2))) == ...
-                round(1/D.param.xScale(2))
+       if round(unique(StimLength(sweepCount+1:sweepCount+size(D.data,2))),-1) == ... % added round because sometimes the ON and OFFSet differ slightly 
+                round(1/D.param.xScale(2)) && ...
+                round(unique(StimLength(sweepCount+1:sweepCount+size(D.data,2))),-1) ~= 20000 % added this to remove the capacitance from falling into LP. It weirdly works otherwise
            stimulus_name = 'Long Pulse' ;  
            BinaryLP(sweepCount+1:sweepCount+size(D.data,2)) = 1;
            BinarySP(sweepCount+1:sweepCount+size(D.data,2)) = 0;
-       elseif unique(StimLength(sweepCount+1:sweepCount+size(D.data,2))) == ...
+       elseif round(unique(StimLength(sweepCount+1:sweepCount+size(D.data,2))),-1) == ...% added round because sometimes the ON and OFFSet differ slightly (like by 1)
                 round(1/D.param.xScale(2))*0.003
            stimulus_name = 'Short Pulse' ;  
            BinaryLP(sweepCount+1:sweepCount+size(D.data,2)) = 0;
            BinarySP(sweepCount+1:sweepCount+size(D.data,2)) = 1;
+       else
+           disp(['Unknown stimulus type with duration of '... includes ramp problem
+                , num2str(unique(StimLength(sweepCount+1:sweepCount+size(D.data,2))/round(1/D.param.xScale(2)))), ' s'])
+            stimulus_name = 'Unknown'; % added 03.02.2022
+           BinaryLP(sweepCount+1:sweepCount+size(D.data,2)) = 0;
+           BinarySP(sweepCount+1:sweepCount+size(D.data,2))  = 0;    
+
        end        
             for s = 1:size(D.data,2)
                 
@@ -129,17 +172,17 @@ for n = 1:length(cellList)
                 sweepCount =  sweepCount + 1;   
             end
             
-   %% Sweep table
+   %% Intracellular recordings table
             
    if sweepCount > 5
-    BinaryLP(isnan(BinaryLP)) = 0;
+    BinaryLP(isnan(BinaryLP)) = 0; % should be accounted for in line 98/99
     BinarySP(isnan(BinarySP)) = 0;
     StimOn(isnan(StimOn)) = 0;
     StimOff(isnan(StimOff)) = 0;
     SweepAmp(isnan(SweepAmp)) = 0;
     
             StimDuration = [];
-            StimDuration = StimOff - StimOn;   
+            StimDuration = StimOff - StimOn;  % Round? 
 
             ic_rec_table = types.core.IntracellularRecordingsTable( ...
                 'categories', {'electrodes', 'stimuli', 'responses'}, ...
@@ -237,6 +280,6 @@ for n = 1:length(cellList)
 
    end
   end
-  filename = fullfile(outputfolder , ['Pittsburgh_',nwb.identifier '.nwb']);
+  filename = fullfile([outputfolder , '\',nwb.identifier '.nwb']);
   nwbExport(nwb, filename);
 end

@@ -9,7 +9,8 @@ else
     error('Too many input arguments.')
 end
 
-listing = dir(fullfile(name(),'**\*.*'));
+% listing = dir(fullfile(name(),'**\*.*'));
+listing = dir(fullfile(name(),'\*.*')); % no subfolders beyond level 1
 listing = listing([listing.isdir]);
 
 inds = [];
