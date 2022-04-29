@@ -1,9 +1,5 @@
 #!/bin/env python
-import shutil
-import os
-import argparse
-import logging
-log = logging.getLogger(__name__)
+
 import pyabf
 from ipfx.x_to_nwb.ABFConverter import ABFConverter
 from ipfx.x_to_nwb.DatConverter import DatConverter
@@ -76,8 +72,6 @@ def compute_failing_sweeps(file_path, passing):
         inter, ind1, _ = np.intersect1d(sweeps, passing, return_indices=True)
         failing_sweeps = np.delete(sweeps, ind1)
 
-
-    
     return failing_sweeps
     
 def main():

@@ -1,5 +1,4 @@
-function [StimOn, StimOff] = GetABFstims(aquiPara, StimOn, BinaryLP, ...
-                            StimOff, sweepCount, SweepsPerFile, sample_int)                       
+function [CS] = GetABFstims(aquiPara, CS, SweepsPerFile, sample_int)                       
              
 if    length(aquiPara.DACEpoch.lEpochInitDuration) > 2                     
       
@@ -10,13 +9,13 @@ else
         aquiPara.DACEpoch.firstHolding;
 end
         
-StimOn(sweepCount:sweepCount+SweepsPerFile-1,1) = tempOn;
+CS.StimOn(CS.swpCt:CS.swpCt+SweepsPerFile-1,1) = tempOn;
 
-if BinaryLP(sweepCount,1)
-    StimOff(sweepCount:sweepCount+SweepsPerFile-1,1) = ...
-       StimOn(sweepCount:sweepCount+SweepsPerFile-1,1) + (1000000/sample_int);
+if CS.BinaryLP(CS.swpCt,1)
+    CS.StimOff(CS.swpCt:CS.swpCt+SweepsPerFile-1,1) = ...
+       CS.StimOn(CS.swpCt:CS.swpCt+SweepsPerFile-1,1) + (1000000/sample_int);
 else
-    StimOff(sweepCount:sweepCount+SweepsPerFile-1,1) = ...
-       StimOn(sweepCount:sweepCount+SweepsPerFile-1,1) + (3000/sample_int);   
+    CS.StimOff(CS.swpCt:CS.swpCt+SweepsPerFile-1,1) = ...
+       CS.StimOn(CS.swpCt:CS.swpCt+SweepsPerFile-1,1) + (3000/sample_int);   
 end   
 end

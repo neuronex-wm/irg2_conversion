@@ -10,7 +10,8 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
-            "args" : ["C:\\Users\\SMest\\Documents\\NHP_MARM\\210311_Marmoset\\MM_for_conversion\\step1", "--metadata", "C:\\Users\\SMest\\Documents\\NHP_MARM\\210311_Marmoset\\MM_for_conversion\\Manual_entry_data.csv"]
+            "args" : ["C:\\Users\\SMest\\Downloads\\Pittsburgh"],
+            "justMyCode": false,
         }
     ]
 }
