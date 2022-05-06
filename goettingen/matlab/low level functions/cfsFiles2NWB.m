@@ -239,7 +239,7 @@ function name = loadIcElecName(json_path)
     end
 end
 
-function [ic_elec,ic_elec_link] = nwbInitElectorde(nwb,ic_elec_name)
+function [ic_elec,ic_elec_link] = nwbInitElectrode(nwb,ic_elec_name)
 
     corticalArea = 'NA'; % Location place holder
 
@@ -268,9 +268,6 @@ function [sweepAmps,stimDesc,sweepNumberEnd,ic_elec] = cfsFile2NWB(CfsFile, ...
 
     ic_elec_name = loadIcElecName([mainfolder, cellID, '\', fileList(f).name(1:end - 3), 'json']);
     
-    [ic_elec,ic_elec_link] = nwbInitElectorde(nwb,ic_elec_name);
-
-    
     stimDesc = createStimDescription(mean(CfsFile.data(:,:,2),2),CfsFile.param.xScale(2));
 
     sweepAmps = [];
@@ -278,6 +275,8 @@ function [sweepAmps,stimDesc,sweepNumberEnd,ic_elec] = cfsFile2NWB(CfsFile, ...
     sweepNumber = sweepNumberStart;
 
     for s = 1:size(CfsFile.data, 2)
+
+        [ic_elec,ic_elec_link] = nwbInitElectrode(nwb,ic_elec_name);
     
         sweepAmps = [sweepAmps,getStimAmplitude(CfsFile.data(:,s,2))];
     
