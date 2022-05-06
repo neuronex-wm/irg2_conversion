@@ -1,18 +1,62 @@
+%CfsFilePaths is a list of paths to cfs files
+
+%mainfolder can be ""
+function nwb = cfsFiles2NWB(CfsFilePaths,AnimalDesc,cellID)
+
+    nwbIdentifier = getNwbIdentifier(AnimalDesc,cellID);
+    nwb = initNwb(nwbIdentifier,AnimalDesc);
+
+    sweepAmps = [];
+    stimDescs=[];
+    sweepNumberEnds=[];
+    
+    sweepCount = 0;
+
+    cellStartTime = -1;
+
+    ic_elec = -1;
+
+    for f = 1:length(CfsFilePaths)
+        file_path = CfsFilePaths(f);
+        cfsFile = readCfsCustom(file_path);
+
+        if f==1 
+            cellStartTime = datetime([cfsFile.param.fDate(1:end-3), ...
+                '/20', cfsFile.param.fDate(end-1:end),' ', cfsFile.param.fTime]...
+             ,'TimeZone', 'local');
+        end
+        ic_elec_name = loadIcElecName([file_path(1:end - 3), 'json']);
+    
+        [tmpSweepAmps,stimDesc,sweepCount,ic_elec] = cfsFile2NWB(cfsFile, nwb,ic_elec_name, sweepCount, cellStartTime);
+
+        sweepAmps= [sweepAmps,tmpSweepAmps];
+        stimDescs=[stimDescs,stimDesc];
+        sweepNumberEnds = [sweepNumberEnds,sweepCount];
+        
+        
+    end
+
+    if (sweepCount>5)
+        ic_rec_table = createIcRecTable(sweepCount, ic_elec,sweepAmps,stimDescs,sweepNumberEnds);
+        nwb.general_intracellular_ephys_intracellular_recordings = ic_rec_table;
+    end
+
+end
 
 function Protocols = createProtocols(stimDescriptions,sweepNumberEnds)
     Protocols = cell.empty;
-    sweepNumber = 0
+    sweepNumber = 1;
     for file_i = 1:length(stimDescriptions)
         stimDesc = stimDescriptions(file_i);
         
         protocol = {'unkown'};
-        if(strcmp(stimDesc.name,"Long Pulse"))
+        if(strcmp(stimDesc.name,'Long Pulse'))
             protocol = {'LP'};
-        elseif
+        elseif(strcmp(stimDesc.name,'Short Pulse'))
             protocol = {'SP'};
         end
         
-        for _ = 1:sweepNumberEnds(file_i)
+        for tmp_ = 1:sweepNumberEnds(file_i)
             Protocols(sweepNumber) = protocol;
             sweepNumber=sweepNumber+1; 
         end
@@ -23,9 +67,9 @@ end
 function [sweep_series_objects_ch1,sweep_series_objects_ch2] = createSweepSeries(sweepNumberEnds)
     sweep_series_objects_ch1 = [];
     sweep_series_objects_ch2 = [];
-    sweepNumber = 0
+    sweepNumber = 0;
     for file_i = 1:length(sweepNumberEnds)
-        for _ = 1:sweepNumberEnds(file_i)
+        for tmp_ = 1:sweepNumberEnds(file_i)
             sweep_ch2 = types.untyped.ObjectView(['/acquisition/', 'Sweep_', num2str(sweepNumber)]);
             sweep_ch1 = types.untyped.ObjectView(['/stimulus/presentation/', 'Sweep_', num2str(sweepNumber)]);
             sweep_series_objects_ch1 = [sweep_series_objects_ch1, sweep_ch1]; 
@@ -37,7 +81,7 @@ end
 
 function ic_rec_table = createIcRecTable(sweepCount, ...
         ic_elec, ...
-        sweepAmps,...
+        SweepAmps,...
         stimDescriptions,...
         sweepNumberEnds... %the end index of the sweepNumber for the individual files
 )
@@ -46,27 +90,27 @@ function ic_rec_table = createIcRecTable(sweepCount, ...
 
     % Add protocol type as column of electrodes table
 
-    Protocols = createProtocols(stimDescriptions,sweepNumberEnds)
+    Protocols = createProtocols(stimDescriptions,sweepNumberEnds);
 
-    [sweep_series_objects_ch1,sweep_series_objects_ch2] = createSweepSeries(sweepNumberEnds)
+    [sweep_series_objects_ch1,sweep_series_objects_ch2] = createSweepSeries(sweepNumberEnds);
 
     stimOn=[];%%StimOn
-    stimDuration = [];%%StimDuration
+    stimCount = [];%%StimDuration
     
     for file_i = 1:length(stimDescriptions)
         stimDesc = stimDescriptions(file_i);
-        for _ = 1:sweepNumberEnds(file_i)
-            stimOn = [stimOn,stimDesc.start_idx]
-            stimDuration = [stimDuration,stimDesc.duration]
+        for tmp_ = 1:sweepNumberEnds(file_i)
+            stimOn = [stimOn,stimDesc.start_idx];
+            stimCount = [stimCount,stimDesc.count];
         end
     end
 
 
-    BinaryLP(isnan(BinaryLP)) = 0; % should be accounted for in line 98/99
-    BinarySP(isnan(BinarySP)) = 0;
-    StimOn(isnan(StimOn)) = 0;
-    StimOff(isnan(StimOff)) = 0;
-    SweepAmp(isnan(SweepAmp)) = 0;
+    %BinaryLP(isnan(BinaryLP)) = 0; % should be accounted for in line 98/99
+    %BinarySP(isnan(BinarySP)) = 0;
+    stimOn(isnan(stimOn)) = 0;
+    %stimOff(isnan(stimOff)) = 0;
+    SweepAmps(isnan(SweepAmps)) = 0;
 
     ic_rec_table = types.core.IntracellularRecordingsTable( ...
         'categories', {'electrodes', 'stimuli', 'responses'}, ...
@@ -102,7 +146,7 @@ function ic_rec_table = createIcRecTable(sweepCount, ...
         'description', 'Column storing the reference to the recorded stimulus for the recording (rows)', ...
         'data', struct( ...
         'idx_start', [stimOn(stimOn ~= 0)'], ...
-        'count', [StimDuration(StimDuration ~= 0)], ...
+        'count', [stimCount(stimCount ~= 0)], ...
         'timeseries', [sweep_series_objects_ch1] ...
     ) ...
     ) ...
@@ -117,7 +161,7 @@ function ic_rec_table = createIcRecTable(sweepCount, ...
         'description', 'Column storing the reference to the recorded response for the recording (rows)', ...
         'data', struct( ...
         'idx_start', [stimOn'], ...
-        'count', [StimDuration], ...
+        'count', [stimCount], ...
         'timeseries', [sweep_series_objects_ch2] ...
     ) ...
     ) ...
@@ -162,27 +206,29 @@ function StimDescription = createStimDescription(data,x_scale)
     [start_i,end_i] = GetStimulusEpoch(data);
     StimDescription.start_idx = start_i;
     StimDescription.end_idx = end_i;
-    StimDescription.duration = (end_i-start_i)*x_scale;
+    StimDescription.count = (end_i-start_i);
 
-    rounded_duration = round(StimDescription.duration,-1);
+    duration = StimDescription.count * x_scale;
+
+    rounded_duration = round(duration,-1);
 
     %%??? see line 120 in cfs2NWBconversionG
-    if rounded_duration == -1
-        StimDescription.name="Long Pulse";
+    if round(duration,-1) == 1
+        StimDescription.name='Long Pulse';
 
-    elseif rounded_duration == -1
-        StimDescription.name="Short Pulse";
+    elseif round(duration,-4) == 0.003
+        StimDescription.name='Short Pulse';
     else
         disp(['Unknown stimulus type with duration of '... includes ramp problem
-        , num2str(rounded_duration, ' s']);
-        StimDescription.name="Unkown";
+        , num2str(rounded_duration), ' s']);
+        StimDescription.name='Unkown';
     end
 
 end
 
 function amp = getStimAmplitude(data,stimDesc)
-    stim_on_data = data(stimDesc.start:stimDesc.end)
-    amp = round(mean(stim_on_data),-1)
+    stim_on_data = data(stimDesc.start_idx:stimDesc.end_idx);
+    amp = round(mean(stim_on_data),-1);
 end
 
 %%???
@@ -190,8 +236,8 @@ end
 %%fTime = D.param.fTime
 %%a: Spannungs Kanal
 %%b: Strom Kanal
-function nwbAddSweep(nwb,sweep_number,electrode,stimulus_name,fTime
-                     data_a,y_unit_a,start_time_rate_a,
+function nwbAddSweep(nwb,sweep_number,electrode,stimulus_name,fTime,...
+                     data_a,y_unit_a,start_time_rate_a,...
                      data_b,y_unit_b,start_time_rate_b)
 
      ccs = types.core.CurrentClampStimulusSeries( ...
@@ -225,7 +271,7 @@ end
 
 
 %%json_path = [mainfolder, cellID, '\', fileList(f).name(1:end - 3), 'json']
-function name = loadIcElecName(json_path)
+function ic_elec_name = loadIcElecName(json_path)
     %% load JSON from MCC get settings files if present
     if isfile(json_path)
         raw = fileread(json_path);
@@ -261,13 +307,13 @@ end
 
 function [sweepAmps,stimDesc,sweepNumberEnd,ic_elec] = cfsFile2NWB(CfsFile, ...
         nwb, ...
+        ic_elec_name, ...
         sweepNumberStart, ...
         cellStartTime)
 
     nwb.session_start_time = cellStartTime;
 
-    ic_elec_name = loadIcElecName([mainfolder, cellID, '\', fileList(f).name(1:end - 3), 'json']);
-    
+   
     stimDesc = createStimDescription(mean(CfsFile.data(:,:,2),2),CfsFile.param.xScale(2));
 
     sweepAmps = [];
@@ -278,12 +324,12 @@ function [sweepAmps,stimDesc,sweepNumberEnd,ic_elec] = cfsFile2NWB(CfsFile, ...
 
         [ic_elec,ic_elec_link] = nwbInitElectrode(nwb,ic_elec_name);
     
-        sweepAmps = [sweepAmps,getStimAmplitude(CfsFile.data(:,s,2))];
+        sweepAmps = [sweepAmps,getStimAmplitude(CfsFile.data(:,s,2),stimDesc)];
     
         nwbAddSweep(nwb,...
                     sweepNumber,...
                     ic_elec_link,stimDesc.name,...
-                    cfsFile.param.fTime,...
+                    CfsFile.param.fTime,...
                     CfsFile.data(:,s,1), CfsFile.param.yUnits{1}, round(1/CfsFile.param.xScale(1)),...
                     CfsFile.data(:,s,2), CfsFile.param.yUnits{2}, round(1/CfsFile.param.xScale(2)));
         
@@ -291,7 +337,7 @@ function [sweepAmps,stimDesc,sweepNumberEnd,ic_elec] = cfsFile2NWB(CfsFile, ...
 
     end
     
-    sweepNumberEnd = sweepNumber
+    sweepNumberEnd = sweepNumber;
 end
 
 function nwb = initNwb(nwbIdentifier,AnimalDesc)
@@ -312,52 +358,10 @@ function nwb = initNwb(nwbIdentifier,AnimalDesc)
 
 end
 
-function ID = getNwbIdentifier(CellName,AnimalDesc,CellID)
+function ID = getNwbIdentifier(AnimalDesc,CellID)
     CellTag = num2str(CellID, '%02.f');
     MATFXID = ['M',AnimalDesc.number,'_',AnimalDesc.name, '_A1_C', CellTag,'_']; % ID for MatFX naming convention - needs to be expanded on
     ID = [MATFXID,'Goettingen', '_',AnimalDesc.Amp,'_Cell', CellTag];
 end
 
-%CfsFilePaths is a list of paths to cfs files
-function nwb = cfsFiles2NWB(CfsFilePaths,AnimalDesc,CellName,CellID)
-
-    nwbIdentifier = getNwbIdentifier(CellName,AnimalDesc,CellID)
-    nwb = initNwb(nwbIdentifier,AnimalDesc);
-
-    sweepAmps = [];
-    stimDescs=[];
-    sweepNumberEnds=[];
-    
-    sweepCount = 0;
-
-    cellStartTime = -1;
-
-    ic_elec = -1;
-
-    for f = 1:length(CfsFilePaths):
-        file_path = CfsFilePaths(f);
-        cfsFile = readCfsCustom(file_path);
-
-        if f==1 
-            cellStartTime = datetime([cfsFile.param.fDate(1:end-3), ...
-                '/20', cfsFile.param.fDate(end-1:end),' ', cfsFile.param.fTime]...
-             ,'TimeZone', 'local');
-        end
-
-        [tmpSweepAmps,stimDesc,sweepCount,ic_elec] = cfsFile2NWB(CfsFile, nwb, sweepCount, cellStartTime);
-
-
-        sweepAmps= [sweepAmps,tmpSweepAmps];
-        stimDescs=[stimDescs,stimDesc];
-        sweepNumberEnds = [sweepNumberEnds,sweepCount];
-        
-        
-    end
-
-    if(sweepCount>5)
-        ic_rec_table = createIcRecTable(sweepCount, ic_elec,sweepAmps,stimDescs,sweepNumberEnds);
-        nwb.general_intracellular_ephys_intracellular_recordings = ic_rec_table;
-    end
-
-end
 

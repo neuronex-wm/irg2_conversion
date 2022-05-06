@@ -5,21 +5,25 @@
 
 %name readCfs already taken by irg2_conversion/goettingen/matlab/third party/matcfs32/readCfs
 function CfsFile = readCfsCustom(fullfilename)
-
+    if(isa(fullfilename,'string'))
+        fullfilename = convertStringsToChars(fullfilename);
+    end
+    disp(fullfilename);
     LSTR = 7;
     DSVAR = 1;
     READ = 0;
     
     % choose files to convert
     
-    
+    disp("test");
     fHandle = matcfs64c('cfsOpenFile',fullfilename,READ,0);
     
     if (fHandle < 0)
         error(['File opening error: ' int2str(fHandle)]);
     end
     
-    D = struct; % initialise Matlab output structure
+    CfsFile = struct; % initialise Matlab output structure
+    
     
     % read file parameters
     [CfsFile.param.fTime,CfsFile.param.fDate,CfsFile.param.fComment] = matcfs64c('cfsGetGenInfo',fHandle);
