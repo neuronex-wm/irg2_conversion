@@ -1,9 +1,9 @@
 %CfsFilePaths is a list of paths to cfs files
 
 %mainfolder can be ""
-function nwb = cfsFiles2NWB(CfsFilePaths,AnimalDesc,cellID)
+function nwb = cfsFiles2NWB(CfsFilePaths,AnimalDesc,cellTag)
 
-    nwbIdentifier = getNwbIdentifier(AnimalDesc,cellID);
+    nwbIdentifier = getNwbIdentifier(AnimalDesc,cellTag);
     nwb = initNwb(nwbIdentifier,AnimalDesc);
 
     sweepAmps = [];
@@ -56,7 +56,11 @@ function Protocols = createProtocols(stimDescriptions,sweepNumberEnds)
             protocol = {'SP'};
         end
         
-        for tmp_ = 1:sweepNumberEnds(file_i)
+        sweepNumberStart = 1;
+        if(file_i>1)
+            sweepNumberStart = sweepNumberEnds(file_i-1)+1;
+        end
+        for tmp_ = sweepNumberStart:sweepNumberEnds(file_i)
             Protocols(sweepNumber) = protocol;
             sweepNumber=sweepNumber+1; 
         end
@@ -69,7 +73,11 @@ function [sweep_series_objects_ch1,sweep_series_objects_ch2] = createSweepSeries
     sweep_series_objects_ch2 = [];
     sweepNumber = 0;
     for file_i = 1:length(sweepNumberEnds)
-        for tmp_ = 1:sweepNumberEnds(file_i)
+        sweepNumberStart = 1;
+        if(file_i>1)
+            sweepNumberStart = sweepNumberEnds(file_i-1)+1;
+        end
+        for tmp_ = sweepNumberStart:sweepNumberEnds(file_i)
             sweep_ch2 = types.untyped.ObjectView(['/acquisition/', 'Sweep_', num2str(sweepNumber)]);
             sweep_ch1 = types.untyped.ObjectView(['/stimulus/presentation/', 'Sweep_', num2str(sweepNumber)]);
             sweep_series_objects_ch1 = [sweep_series_objects_ch1, sweep_ch1]; 
@@ -99,7 +107,11 @@ function ic_rec_table = createIcRecTable(sweepCount, ...
     
     for file_i = 1:length(stimDescriptions)
         stimDesc = stimDescriptions(file_i);
-        for tmp_ = 1:sweepNumberEnds(file_i)
+        sweepNumberStart = 1;
+        if(file_i>1)
+            sweepNumberStart = sweepNumberEnds(file_i-1)+1;
+        end
+        for tmp_ = sweepNumberStart:sweepNumberEnds(file_i)
             stimOn = [stimOn,stimDesc.start_idx];
             stimCount = [stimCount,stimDesc.count];
         end
@@ -210,17 +222,16 @@ function StimDescription = createStimDescription(data,x_scale)
 
     duration = StimDescription.count * x_scale;
 
-    rounded_duration = round(duration,-1);
 
     %%??? see line 120 in cfs2NWBconversionG
-    if round(duration,-1) == 1
+    if round(duration,0) == 1
         StimDescription.name='Long Pulse';
 
-    elseif round(duration,-4) == 0.003
+    elseif round(duration,3) == 0.003
         StimDescription.name='Short Pulse';
     else
         disp(['Unknown stimulus type with duration of '... includes ramp problem
-        , num2str(rounded_duration), ' s']);
+        , num2str(round(duration,3)), ' s']);
         StimDescription.name='Unkown';
     end
 
@@ -358,8 +369,8 @@ function nwb = initNwb(nwbIdentifier,AnimalDesc)
 
 end
 
-function ID = getNwbIdentifier(AnimalDesc,CellID)
-    CellTag = num2str(CellID, '%02.f');
+function ID = getNwbIdentifier(AnimalDesc,CellTag)
+    
     MATFXID = ['M',AnimalDesc.number,'_',AnimalDesc.name, '_A1_C', CellTag,'_']; % ID for MatFX naming convention - needs to be expanded on
     ID = [MATFXID,'Goettingen', '_',AnimalDesc.Amp,'_Cell', CellTag];
 end

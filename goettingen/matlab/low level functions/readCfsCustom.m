@@ -15,7 +15,6 @@ function CfsFile = readCfsCustom(fullfilename)
     
     % choose files to convert
     
-    disp("test");
     fHandle = matcfs64c('cfsOpenFile',fullfilename,READ,0);
     
     if (fHandle < 0)
