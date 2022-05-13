@@ -1,9 +1,11 @@
-%mainfolder = uigetdir('','Select main folder containing all cell folders'); % select individual folders at start
-%outputfolder = uigetdir(mainfolder,'Select output folder'); 
+
 
 % for debugging
 mainfolder = 'F:\uni\nebenjob\data\NPI Neuroanatomy - Raw Data CFS-Files\Eisenherz_01032022\Jenifer_20220301';
 outputfolder = 'F:\uni\nebenjob\output\cfs';
+
+mainfolder = uigetdir('','Select main folder containing all cell folders'); % select individual folders at start
+outputfolder = uigetdir(mainfolder,'Select output folder'); 
 
 %for debugging
 desc = struct;
@@ -17,7 +19,7 @@ desc.sex = 'T';
 % capitalizes first letter
 desc.species = 'T'; 
 
-%desc = getAnimalDesc();
+desc = getAnimalDesc();
 
 cellList = getCellNames(mainfolder);
 
