@@ -25,7 +25,7 @@ deleteList = dir(fullfile(outputfolder,'*Goettingen*.nwb'));
 
 global sname % globals as a way to see if dialog was already run once - if it errors out
 global snumber
-[snumber, name, devID, sname, sage, ssex, sspecies] = miscdesc(); % added this for description of animal and ID generation
+[snumber, name, devID, sname, sage, ssex, sspecies, area] = miscdesc(); % added this for description of animal and ID generation
 
 for k = 1 : length(deleteList) % loop deletes old converted files in the folder 
   baseFileName = [deleteList(k).name];
@@ -78,7 +78,7 @@ for f = 1:length(fileList)
         'sex', ssex, ...
         'species', sspecies ...
     );
-    corticalArea = 'NA'; 
+    corticalArea = area; 
 
     
     device_name = [datFile.trees.ampTree{1, 1}.RoAmplifierName];  % Hardcoded amp name   
@@ -114,7 +114,7 @@ for f = 1:length(fileList)
                          '/general/intracellular_ephys/' ic_elec_name]);   
     for e = 1:height(datFile.RecTable)      % number of rows in RecTable = number of recordings 
          for s = 1:datFile.RecTable.nSweeps(e) % goes through each sweep
-             if ~contains(datFile.RecTable.Stimulus(e), 'sine') & ~contains(datFile.RecTable.Stimulus(e), 'Tune')  % used to ignore dynamic gain protocols & Tune protocol           
+             if ~contains(datFile.RecTable.Stimulus(e), 'sine') & ~contains(datFile.RecTable.Stimulus(e), 'Tune') & ~contains(datFile.RecTable.Stimulus(e), 'ID15')  % used to ignore dynamic gain protocols & Tune protocol           
                 
                  stimData = datFile.RecTable.stimWave{e,1}.DA_2(:,s); % stimulus data for each sweep %% ORIGINAL
                  
@@ -137,16 +137,28 @@ for f = 1:length(fileList)
 
                 stimDuration = StimOff(sweepCount+1,1)-StimOn(sweepCount+1,1); % length of stimulus at 50kHz sampling rate
                 if  stimDuration/round(datFile.RecTable.SR(e)) == 1 % WHY IS THIS BETTER THAN IF from before?
+                 disp(['Long Pulse stimulus with duration of '...
+                            , num2str(stimDuration/round(datFile.RecTable.SR(e))), 's'])
                  stimDescrp = 'Long Pulse';  
                  BinaryLP(sweepCount+1,1)  = 1;
                  BinarySP(sweepCount+1,1)  = 0;
                 elseif stimDuration/round(datFile.RecTable.SR(e)) == 0.003
+                 disp(['Short Pulse stimulus with duration of '...
+                            , num2str(stimDuration/round(datFile.RecTable.SR(e))), 's'])
                  stimDescrp = 'Short Pulse';
                  BinaryLP(sweepCount+1,1) = 0;
                  BinarySP(sweepCount+1,1)  = 1;
+                elseif contains(datFile.RecTable.Stimulus(e),'Ramp') % Ramp
+                 stimDuration =  length(datFile.RecTable.dataRaw{e,1}{1, 2}(:,s)) - StimOn(sweepCount+1,1); % stim wave doesnt account for early abort so I used the actual data length  
+                 disp(['Ramp stimulus with duration of '...
+                            , num2str(stimDuration/round(datFile.RecTable.SR(e))), 's'])
+                 stimDescrp = 'Ramp';
+                 BinaryLP(sweepCount+1,1) = 0;
+                 BinarySP(sweepCount+1,1)  = 0;                    
                 else
                  disp(['Unknown stimulus type with duration of '...
                             , num2str(stimDuration/round(datFile.RecTable.SR(e))), 's'])
+                 stimDescrp = 'Unknown';
                  BinaryLP(sweepCount+1,1) = 0;
                  BinarySP(sweepCount+1,1)  = 0;                    
                 end
@@ -159,9 +171,9 @@ for f = 1:length(fileList)
                  ccs = types.core.CurrentClampStimulusSeries( ... %generates the stimulus in nwb; separate for each sweep
                         'electrode', ic_elec_link, ...
                         'gain', ampState.sCurrentGain*1e-12, ... gain is referenced to A for some reason in the amptree; this converts it back to pA/mV
-                        'stimulus_description', datFile.RecTable.Stimulus(e), ... % protocol name
-                        'data_unit', cell2mat(datFile.RecTable.stimUnit{2,1}(1)), ...% hard coded reference of second sweep! CHECK!!
-                        'data', stimData, ...
+                        'stimulus_description', stimDescrp, ... % protocol name; old %'stimulus_description', datFile.RecTable.Stimulus(e), 
+                        'data_unit', 'pA' , ...% hard coded reference of second sweep! CHECK!! cell2mat(datFile.RecTable.stimUnit{2,1}(1))
+                        'data', stimData*1e3, ... & Heka calls it ampere but it is act pA mapped to mA
                         'sweep_number', sweepCount,...
                         'starting_time', startT,...
                         'starting_time_rate', round(datFile.RecTable.SR(e))...
@@ -171,13 +183,13 @@ for f = 1:length(fileList)
 
                  nwb.acquisition.set(['Sweep_', num2str(sweepCount)], ... % generates the response to stimulus in nwb - currentclampseries; could be put in separate variable
                       types.core.CurrentClampSeries( ...
-                        'bias_current', datFile.RecTable.Vhold{e,1}{1, 2}(s), ... % Unit: Amp
+                        'bias_current', datFile.RecTable.Vhold{e,1}{1, 2}(s)*1e-12, ... % Unit: pA 
                         'bridge_balance', ampState.sRsValue , ... % Unit: Ohm; TO be decided whether this is the correct Rs value
                         'capacitance_compensation', ampState.sCFastAmp2+ampState.sCFastAmp1, ... % Unit: Farad
-                        'data', datFile.RecTable.dataRaw{e,1}{1, 2}(:,s), ... % writes single sweeps
-                        'data_unit', cell2mat(datFile.RecTable.ChUnit{2,1}(2)), ... % voltage Channel unit
+                        'data', datFile.RecTable.dataRaw{e,1}{1, 2}(:,s)*1e3, ... % writes single sweeps; changed to mV
+                        'data_unit','mV', ... % voltage Channel unit; old:  cell2mat(datFile.RecTable.ChUnit{2,1}(2))
                         'electrode', ic_elec_link, ...
-                        'stimulus_description', datFile.RecTable.Stimulus(e), ... % protocol name   
+                        'stimulus_description', stimDescrp, ... % protocol name; old %'stimulus_description', datFile.RecTable.Stimulus(e), ... % protocol name
                         'sweep_number', sweepCount,...
                         'starting_time', startT,...
                         'starting_time_rate', round(datFile.RecTable.SR(e))...
@@ -242,7 +254,7 @@ for f = 1:length(fileList)
         'description', 'Table for storing intracellular response related metadata.', ...
         'colnames', {'response'}, ...
         'id', types.hdmf_common.ElementIdentifiers( ...
-            'data', int64([0:sweepCount-2]) ...
+            'data', int64([0:sweepCount-1]) ... %changed to -1 at 04.05.2022
         ), ...
         'response', types.core.TimeSeriesReferenceVectorData( ...
             'description', 'Column storing the reference to the recorded response for the recording (rows)', ...
