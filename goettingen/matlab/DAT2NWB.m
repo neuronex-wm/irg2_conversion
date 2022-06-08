@@ -15,7 +15,7 @@
 
 clear
 
-mainfolder = uigetdir('','Select main folder'); % select individual folders at start
+mainfolder = uigetdir('E:\Data\MonkeyData','Select main folder'); % select individual folders at start
 outputfolder = uigetdir(mainfolder,'Select output folder');  
 
 %fileList = dir(fullfile(mainfolder,'**\*.dat*')); % With subfolders
@@ -183,7 +183,7 @@ for f = 1:length(fileList)
 
                  nwb.acquisition.set(['Sweep_', num2str(sweepCount)], ... % generates the response to stimulus in nwb - currentclampseries; could be put in separate variable
                       types.core.CurrentClampSeries( ...
-                        'bias_current', datFile.RecTable.Vhold{e,1}{1, 2}(s)*1e-12, ... % Unit: pA 
+                        'bias_current', datFile.RecTable.Vhold{e,1}{1, 2}(s)*1e+12, ... % Unit: pA 
                         'bridge_balance', ampState.sRsValue , ... % Unit: Ohm; TO be decided whether this is the correct Rs value
                         'capacitance_compensation', ampState.sCFastAmp2+ampState.sCFastAmp1, ... % Unit: Farad
                         'data', datFile.RecTable.dataRaw{e,1}{1, 2}(:,s)*1e3, ... % writes single sweeps; changed to mV
