@@ -6,7 +6,7 @@ clear
 
 
 
-mainfolder = uigetdir('','Select main folder containing all cell folders'); % select individual folders at start
+mainfolder = uigetdir('E:\Data\MonkeyData','Select main folder containing all cell folders'); % select individual folders at start
 outputfolder = uigetdir(mainfolder,'Select output folder'); 
 
 cellList = getCellNames(mainfolder);
@@ -17,7 +17,7 @@ try % doesnt work
     A = evalin('base','snumber');   
 catch
     A= 0;
-    [snumber, name, devID, sname, sage, ssex, sspecies] = miscdesc(); % added this for description of animal and ID generation
+    [snumber, name, devID, sname, sage, ssex, sspecies, area] = miscdesc(); % added this for description of animal and ID generation
 end
 
 
@@ -44,17 +44,7 @@ for n = 1:length(cellList)
         'general_experiment_description', 'Characterizing intrinsic biophysical properties of cortical NHP neurons.', ...
         'session_description', 'One experiment day' ...
     );
-    %idx = find(strcmp(T.IDS, cellID));
-%     if isempty(idx)
-%         disp('Manual entry data not found')
-%          nwb.general_subject = types.core.Subject( ...
-%       'description', 'NA', 'age', 'NA', ...
-%       'sex', 'NA', 'species', 'NA');
-%     else    
-%       nwb.general_subject = types.core.Subject( ...
-%         'description', T.SubjectID(idx), 'age', num2str(T.SubjectAge(idx)), ...
-%         'sex', T.SubjectSex(idx), 'species', T.SubjectBreed(idx));
-%     end
+
     device_name = 'CED digitizer Power 1401 mkII; Amplifier: SEC-05X';  % @Stefan: hier bitte die richtigen 
 
     disp('Manual entry data not found') % Species data
@@ -66,7 +56,7 @@ for n = 1:length(cellList)
         'species', sspecies ...
     );
 
-    corticalArea = 'NA'; % Location place holder
+    corticalArea = area; % Location place holder
      
     %% loading the matlab converted cfs files
     paths = fullfile({fileList.folder}, {fileList.name});
@@ -92,7 +82,7 @@ for n = 1:length(cellList)
           electOffset = NaN;
          end 
    %% Getting run and electrode associated properties  
-        nwb.general_devices.set(device_name, types.core.Device());
+        nwb.general_devices.set(device_name, types.core.Device()); %% add more general devices
         device_link = types.untyped.SoftLink(['/general/devices/' device_name]);
         ic_elec = types.core.IntracellularElectrode( ...
             'device', device_link, ...
@@ -125,6 +115,13 @@ for n = 1:length(cellList)
            stimulus_name = 'Short Pulse' ;  
            BinaryLP(sweepCount+1:sweepCount+size(D.data,2)) = 0;
            BinarySP(sweepCount+1:sweepCount+size(D.data,2)) = 1;
+       elseif unique(StimLength(sweepCount+1:sweepCount+size(D.data,2))) < 0 % maybe catches an error
+           disp(['ERROR: stimulus type with NEGATIVE duration of '... includes ramp problem
+                , num2str(unique(StimLength(sweepCount+1:sweepCount+size(D.data,2))/round(1/D.param.xScale(2)))), ' s'])
+           pause
+           stimulus_name = 'Unknown'; % added 03.02.2022
+           BinaryLP(sweepCount+1:sweepCount+size(D.data,2)) = 0;
+           BinarySP(sweepCount+1:sweepCount+size(D.data,2))  = 0;    
        else
            disp(['Unknown stimulus type with duration of '... includes ramp problem
                 , num2str(unique(StimLength(sweepCount+1:sweepCount+size(D.data,2))/round(1/D.param.xScale(2)))), ' s'])
@@ -153,7 +150,7 @@ for n = 1:length(cellList)
                 
                 nwb.acquisition.set(['Sweep_', num2str(sweepCount)], ...
                     types.core.CurrentClampSeries( ...
-                        'bias_current', [], ... % Unit: Amp
+                        'bias_current', [],...%mean(D.data(StimOn-(0.45/D.param.xScale(1)):StimOn,s,2))*1e-12, ... % Unit: pA; Extracting bias current from current trace. Reference is StimOn. Start is 450 ms before StimOn which should be the end of test pulse but not all traces have a test pulse.
                         'bridge_balance', [], ... % Unit: Ohm
                         'capacitance_compensation', [], ... % Unit: Farad
                         'data', D.data(:,s,1), ...
@@ -279,7 +276,10 @@ for n = 1:length(cellList)
         nwb.general_intracellular_ephys_intracellular_recordings = ic_rec_table;
 
    end
-  end
-  filename = fullfile([outputfolder , '\',nwb.identifier '.nwb']);
+    end
+%         if ~exist(outputfolder, 'dir')
+%             mkdir(outputfolder)
+%         end
+    filename = fullfile([outputfolder , '\',nwb.identifier '.nwb']);
   nwbExport(nwb, filename);
 end
