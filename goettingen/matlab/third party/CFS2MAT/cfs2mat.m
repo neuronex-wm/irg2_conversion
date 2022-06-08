@@ -31,23 +31,34 @@ DSVAR = 1;
 READ = 0;
 
 % choose files to convert
+%added by Stefan
+mainfolder = uigetdir('','Select main folder');
+% listing = dir(fullfile(name(),'\*.*'));
+% listing = listing([listing.isdir]);
 
-[fName, cfsDir] = uigetfile({'*.cfs','CFS files (*.cfs)'}, ...
-    'Choose a file to load','multiselect','on');
+fileList = dir(fullfile(mainfolder,'**\*.cfs*'));
+%added by Stefan
 
-if numel(fName) == 1 & all(fName == 0),
-    error('No valid file selected');
-end
 
-if isstr(fName)
-    fName = {fName};
-end
+% [fName, cfsDir] = uigetfile({'*.cfs','CFS files (*.cfs)'}, ...
+%     'Choose a file to load','multiselect','on');
+% 
+% if numel(fName) == 1 & all(fName == 0),
+%     error('No valid file selected');
+% end
+% 
+% if isstr(fName)
+%     fName = {fName};
+% end
+
+fName = 1:length(fileList); %added stefan
 
 % loop over all chosen files
 
 for fCount = 1:length(fName)
     
-    fullfilename = [cfsDir fName{fCount}];
+    %fullfilename = [cfsDir fName{fCount}];
+    fullfilename = fullfile(fileList(fCount).folder, fileList(fCount).name); % added Stefan
     
     fHandle = matcfs64c('cfsOpenFile',fullfilename,READ,0);
     
@@ -101,7 +112,8 @@ for fCount = 1:length(fName)
 
    ret = matcfs64c('cfsCloseFile',fHandle); % close the CFS file
    
-   outName = [cfsDir fName{fCount}(1:end-4)];
+   %outName = [cfsDir fName{fCount}(1:end-4)];
+   outName = fullfilename(1:end-4); % added by stefan
    
    save(outName,'D') % save the Matlab structure
    
