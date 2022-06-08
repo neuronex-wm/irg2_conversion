@@ -224,7 +224,7 @@ function StimDescription = createStimDescription(data,x_scale)
 
 
     %%??? see line 120 in cfs2NWBconversionG
-    if round(duration,0) == 1 && length(data) == 400000 % length check needed to prevent misslabeling of capacitance recordings as LP
+    if round(duration,0) == 1 && length(data) == 400000
         StimDescription.name='Long Pulse';
 
     elseif round(duration,3) == 0.003
