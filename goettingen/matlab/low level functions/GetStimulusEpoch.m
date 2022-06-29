@@ -35,7 +35,7 @@ if isempty(negPeak) || isempty(posPeak) % to find anything if previous failed
             end
     end
 
-else
+end
 % End odd thing
 
 if negPeak(end) >=80000 || posPeak(end)  >=80000 % loop for ramp with variable endpoint 
@@ -71,6 +71,5 @@ else
             StimOff = negPeak;
         end
     end
-end
 end
 end

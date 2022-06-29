@@ -6,7 +6,7 @@ clear
 
 
 
-mainfolder = uigetdir('E:\Data\MonkeyData','Select main folder containing all cell folders'); % select individual folders at start
+mainfolder = uigetdir('E:\Data\MonkeyData\Monkeys','Select main folder containing all cell folders'); % select individual folders at start
 outputfolder = uigetdir(mainfolder,'Select output folder'); 
 
 cellList = getCellNames(mainfolder);
@@ -132,6 +132,12 @@ for n = 1:length(cellList)
        end        
             for s = 1:size(D.data,2)
                 
+                if On-(0.45/D.param.xScale(1)) < 0 % calculating bias current
+                    bias = mean(D.data(1:On,s,2)); % no testpulse or unknown protocols; pA
+                else
+                    bias = mean(D.data(ceil(On-(0.45/D.param.xScale(1))):On,s,2)); % with test pulse; pA; ceil because matlab throws an error otherwise
+                end
+                
                 SweepAmp(sweepCount+1) = round(mean(D.data(StimOn(sweepCount+1)...
                                                 :StimOff(sweepCount+1),s,2)),-1);
                 
@@ -150,7 +156,7 @@ for n = 1:length(cellList)
                 
                 nwb.acquisition.set(['Sweep_', num2str(sweepCount)], ...
                     types.core.CurrentClampSeries( ...
-                        'bias_current', [],...%mean(D.data(StimOn-(0.45/D.param.xScale(1)):StimOn,s,2))*1e-12, ... % Unit: pA; Extracting bias current from current trace. Reference is StimOn. Start is 450 ms before StimOn which should be the end of test pulse but not all traces have a test pulse.
+                        'bias_current', bias,...%mean(D.data(StimOn-(0.15/D.param.xScale(1)):StimOn,s,2))*1e-12, ... % Unit: pA; Extracting bias current from current trace. Reference is StimOn. Start is 450 ms before StimOn which should be the end of test pulse but not all traces have a test pulse.
                         'bridge_balance', [], ... % Unit: Ohm
                         'capacitance_compensation', [], ... % Unit: Farad
                         'data', D.data(:,s,1), ...
