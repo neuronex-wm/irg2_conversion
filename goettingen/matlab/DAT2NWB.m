@@ -12,6 +12,7 @@
 % - Current amp relative to holding!
 % - Species data
 % - TuneCfast causes problems due to DAC_0 at line 117
+% - DA_2/1 needs to be checked to work with single and double amps
 
 clear
 
@@ -25,7 +26,7 @@ deleteList = dir(fullfile(outputfolder,'*Goettingen*.nwb'));
 
 global sname % globals as a way to see if dialog was already run once - if it errors out
 global snumber
-[snumber, name, devID, sname, sage, ssex, sspecies, area] = miscdesc(); % added this for description of animal and ID generation
+[snumber, name, devID, sname, sage, ssex, sspecies, area, weight] = miscdesc(); % added this for description of animal and ID generation
 
 for k = 1 : length(deleteList) % loop deletes old converted files in the folder 
   baseFileName = [deleteList(k).name];
@@ -54,7 +55,13 @@ for f = 1:length(fileList)
     User = datFile.trees.dataTree{3, 3}.SeUsername; % Extracted from the first recording assuming that one user does all the recordings on one day  
     CellTag = num2str(CellCounter, '%02.f'); % writes internal cell tag & pads single digits with a zero
     
-    MATFXID = ['M',snumber,'_',cellfun(@(a) a(1),strsplit(User)), '_A1_C', CellTag,'_']; % ID for MatFX naming convention - needs to be expanded on
+    % old way of user extraction cellfun(@(a) a(1),strsplit(User))
+    switch area
+        case 'PFC'
+            MATFXID = ['M',snumber,'_',name, '_A1_C', CellTag,'_']; % ID for MathFX
+        case 'V1'
+            MATFXID = ['M',snumber,'_',name, '_A2_C', CellTag,'_'];
+    end
     ID = [MATFXID,'Goettingen', '_', devID,'_Cell', CellTag]; % unique identifier would be helpful - maybe date from labels or ampstate?
     disp(['New cell found, ID: ', ID])     
     %% Initializing variables for Sweep table construction
@@ -76,7 +83,8 @@ for f = 1:length(fileList)
         'description', sname, ...
         'age', sage, ...
         'sex', ssex, ...
-        'species', sspecies ...
+        'species', sspecies, ...
+        'weight', weight ...
     );
     corticalArea = area; 
 
@@ -96,7 +104,7 @@ for f = 1:length(fileList)
          length(datFile.RecTable.TimeStamp{i,1})) - datFile.RecTable.TimeStamp{i,1}(1);   % calculates duration by looking at the number of time stamps for each recording and substracting the first from the last: Last time stamp in the list - first time stamp in the list
       temp_vec(i) = datFile.RecTable.Temperature(i)+2.5; % on average the center of the chamber is at least + 2 degrees warmer
     end
-    Temperature = sum(temp_vec.*(dur/sum(dur,'omitnan')),'omitnan'); % Nansum is not recommmended anymore and part of a toolbox.
+    Temperature = sum(temp_vec.*(dur/sum(dur,'omitnan')),'omitnan'); 
     %% Getting run and electrode associated properties  
 
     ic_elec = types.core.IntracellularElectrode( ...
@@ -116,12 +124,19 @@ for f = 1:length(fileList)
          for s = 1:datFile.RecTable.nSweeps(e) % goes through each sweep
              if ~contains(datFile.RecTable.Stimulus(e), 'sine') & ~contains(datFile.RecTable.Stimulus(e), 'Tune') & ~contains(datFile.RecTable.Stimulus(e), 'ID15')  % used to ignore dynamic gain protocols & Tune protocol           
                 
-                 stimData = datFile.RecTable.stimWave{e,1}.DA_2(:,s); % stimulus data for each sweep %% ORIGINAL
+                 if contains(datFile.RecTable.Stimulus(e), 'Rheo') %Rheo protocols require substraction of holding current for correct sweep amps due the way they were recorded
+                     stimMask = datFile.RecTable.stimWave{e,1}.DA_2(:,s) ~= 0;
+                     stimData = datFile.RecTable.stimWave{e,1}.DA_2(:,s);
+                     stimData(stimMask) = stimData(stimMask)-datFile.RecTable.Vhold{e,1}{1, 2}(s)*1e+9;
+                     disp('Detected Rheo pulse')
+                 else
+                     stimData = datFile.RecTable.stimWave{e,1}.DA_2(:,s); % stimulus data for each sweep %% ORIGINAL
+                 end
                  
                  if length(stimData) < 9900
                    SweepAmp(sweepCount+1,1) = round(1000*mean(nonzeros(stimData)));  % for short recordings? But at 50 kHz this amounts to about 200 ms - only removes the depol at the beginning               
                  else
-                   SweepAmp(sweepCount+1,1) = round(1000*mean(nonzeros(stimData(9900:end)))); %check if this works for non-relative holding 
+                   SweepAmp(sweepCount+1,1) = round(1000*mean(nonzeros(stimData(9900:end)))); 
                  end
                  if SweepAmp(sweepCount+1,1) <= 0 % defines stimulus on and off by differentiating and looking for f' peaks --> inflection points or rather impuls for square wave
                     [~, temp] = findpeaks(diff(stimData));
