@@ -1,4 +1,4 @@
-function abf2NWB(varargin)
+function abf2NWB(inputfolder, outputfolder)
 
 %{ 
 Converts all abf files in one folder into one nwb file with the same name
@@ -8,44 +8,25 @@ only one input argument is used the location is used for both input and
 output. The NWB schema is 2.4.0
 %}
 dbstop if error  
-check = 0;
-count = 1;
-for v = 1:nargin
-    if check == 0 && (isa(varargin{v}, 'char') || isa(varargin{v}, 'string'))
-        mainfolder = varargin{v};
-        if endsWith(mainfolder, '\') || endsWith(mainfolder, '/')
-          mainfolder(length(mainfolder)) = [];
-        end
-        cellList = getCellNames(mainfolder);
-        check = 1;
-    elseif (isa(varargin{v}, 'char') || isa(varargin{v}, 'string'))
-        outputfolder = varargin{v};
-        if endsWith(outputfolder, '\') || endsWith(outputfolder, '/')
-          outputfolder(length(outputfolder)) = [];
-        end
-        disp('No overwrite mode')
-        for k = 1 : length(cellList)
-          baseFileName = [cellList(k).name, '.nwb'];
-          fullFileName = fullfile(outputfolder, baseFileName);
-          fprintf(1, 'Now deleting %s\n', fullFileName);
-          delete(fullFileName);
-        end
-    end
-end
+inputList = getCellNames(inputfolder);
+outputList = dir(fullfile(outputfolder, '*.nwb'));
+Idx = ismember({inputList.name},...
+         cellfun(@(z)z(1:end-4),{outputList.name},'UniformOutput',false));
+inputList(Idx)=[];
 sessionTag = 'M00';  
-
+count = 1;
 %% Reading Western's manual entry data table
-if isfile([mainfolder, '\manual_entry_data.csv'])
-  T = readtable([mainfolder, '\manual_entry_data.csv']);
+if isfile([inputfolder, '\manual_entry_data.csv'])
+  T = readtable([inputfolder, '\manual_entry_data.csv']);
 else
     error('No manual entry data detected')
 end
 %% Cell loop
-for n = 1:length(cellList)
+for n = 1:length(inputList)
     %% Initalizing and general descriptors
     CS = struct();
-    CS.mainfolder=mainfolder;
-    [nwb, CS] = initNWB(cellList, n, CS);
+    CS.mainfolder=inputfolder;
+    [nwb, CS] = initNWB(inputList, n, CS);
     nwb.general_institution = 'University of Western Ontario'; 
     nwb.general_lab = 'Martinez-Trujillo/Inoue';  
     nwb.general_devices.set('Amplifier', ...
@@ -61,7 +42,7 @@ for n = 1:length(cellList)
        nwb.general_surgery = 'Bioopsies; Anaesthesia; choline-based slicing solution';     
     end 
     %% loading the abf files
-    fileList = dir([mainfolder,'/',cellList(n,1).name,'/*.abf']);
+    fileList = dir([inputfolder,'/',inputList(n,1).name,'/*.abf']);
     paths = fullfile({fileList.folder}, {fileList.name});    
     %% files within cell loop 
     for f = 1:length(fileList)
@@ -156,9 +137,9 @@ for n = 1:length(cellList)
                         'stimulus_description', stimDescrp, ...
                         'data_unit', 'pA', ...
                         'data', stimData, ...
-                        'sweep_number', CS.swpCt,...
+                        'sweep_number', uint64(CS.swpCt),...
                         'starting_time', aquiPara.uFileStartTimeMS/1000,...
-                        'starting_time_rate', 1000000/sample_int...
+                        'starting_time_rate', single(1000000/sample_int)...
                         );
                     
                 nwb.stimulus_presentation.set(['Sweep_', num2str(CS.swpCt-1)], ccss);    
@@ -172,11 +153,10 @@ for n = 1:length(cellList)
                         'data_unit', aquiPara.recChUnits{:}, ...
                         'electrode', ICelecLink, ...
                         'stimulus_description', stimDescrp, ...   
-                        'sweep_number', CS.swpCt,...
+                        'sweep_number', uint64(CS.swpCt),...
                         'starting_time', aquiPara.uFileStartTimeMS/1000,...
-                        'starting_time_rate', 1000000/sample_int...
+                        'starting_time_rate', single(1000000/sample_int)...
                           ));
-                    
                     
                 sweep_ch2 = types.untyped.ObjectView(['/acquisition/', 'Sweep_', num2str(CS.swpCt-1)]);
                 sweep_ch1 = types.untyped.ObjectView(['/stimulus/presentation/', 'Sweep_', num2str(CS.swpCt-1)]);
