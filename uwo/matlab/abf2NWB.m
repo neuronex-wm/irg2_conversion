@@ -83,7 +83,11 @@ for n = 1:length(inputList)
         CS.swpCt =  CS.swpCt + 1;   
               
       elseif ~contains(aquiPara.protocolName, 'noise')  
-            stimInd = find(aquiPara.DACEpoch.fEpochLevelInc~=0);   
+          if length(aquiPara.DACEpoch.lEpochInitDuration) < 4              % If there is no test pulse files usual have 2-3 segments; the 2nd segment is always the stimulus period
+            stimInd = 2;             
+          else
+            stimInd = 4; 
+          end
             stimDuration = aquiPara.DACEpoch.lEpochInitDuration(stimInd);
             SwpsPerFile = size(data,3);
             if  stimDuration*(sample_int/1000) == 1000 
