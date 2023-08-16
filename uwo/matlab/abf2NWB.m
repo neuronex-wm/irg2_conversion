@@ -7,6 +7,7 @@ files. Second input argument is the path at which nwb files are saved. If
 only one input argument is used the location is used for both input and
 output. The NWB schema is 2.4.0
 %}
+generateCore('2.4.0')
 dbstop if error  
 inputList = getCellNames(inputfolder);
 outputList = dir(fullfile(outputfolder, '*.nwb'));
@@ -61,9 +62,14 @@ for n = 1:length(inputList)
      stimulus_name = aquiPara.protocolName(...
             find(aquiPara.protocolName=='\',1, 'last')+1:end);
         
-      if isempty(aquiPara.DACEpoch) && ~contains(aquiPara.protocolName, ['noise']) ...
-                && ~contains(aquiPara.protocolName, ['chirp']) ...
-           
+      if isempty(aquiPara.DACEpoch) && ...
+              ~contains(aquiPara.protocolName, ['noise']) ...
+                && ~contains(aquiPara.protocolName, ['chirp']) && ...
+                ~contains(aquiPara.protocolName, ['OU'])  ...
+                && ~contains(aquiPara.protocolName, ['DG']) && ...
+                ~contains(aquiPara.protocolName, [ 'protocol name could not be identified']) 
+          
+        disp(aquiPara.protocolName) 
         nwb.acquisition.set(['Sweep_', num2str(CS.swpCt-1)], types.core.IZeroClampSeries( ...
               'bridge_balance', CS.brigBal, ... % Unit: Ohm
               'capacitance_compensation', CS.capComp, ... % Unit: Farad
@@ -82,7 +88,11 @@ for n = 1:length(inputList)
              CS.BinaryLP(CS.swpCt,1), CS.BinarySP(CS.swpCt,1)] = deal(NaN);
         CS.swpCt =  CS.swpCt + 1;   
               
-      elseif ~contains(aquiPara.protocolName, 'noise')  
+      elseif ~contains(aquiPara.protocolName, 'noise') && ...
+                ~contains(aquiPara.protocolName, ['OU'])  ...
+                && ~contains(aquiPara.protocolName, ['DG']) && ...
+                ~contains(aquiPara.protocolName, [ 'protocol name could not be identified']) 
+
           if length(aquiPara.DACEpoch.lEpochInitDuration) < 4              % If there is no test pulse files usual have 2-3 segments; the 2nd segment is always the stimulus period
             stimInd = 2;             
           else
@@ -116,7 +126,9 @@ for n = 1:length(inputList)
                 
                 if  aquiPara.DACEpoch.fEpochLevelInc(stimInd) < 1          % current is in nanoAmp
                     CS.SwpAmp(CS.swpCt,1)= CS.SwpAmp(CS.swpCt,1)*1000;
+                    if isfield(CS,'testAmp')
                     CS.testAmp(CS.swpCt,1) = CS.testAmp(CS.swpCt,1)*1000;
+                    end
                 end
                 
                 if length(aquiPara.DACEpoch.fEpochInitLevel) > 2 
@@ -126,6 +138,8 @@ for n = 1:length(inputList)
                    zeros(1,aquiPara.DACEpoch.lEpochInitDuration(3)), ...
                      ones(1,aquiPara.DACEpoch.lEpochInitDuration(4)).*CS.SwpAmp(CS.swpCt,1),...
                        zeros(1,length(data)- CS.StimOff(CS.swpCt,1))]';
+                elseif size(data,2)>1 
+                 stimData = data(:,2,s);
                 else
                     disp(['No test pulse in file', paths{1,f}])
                  stimData = [zeros(1,aquiPara.DACEpoch.lEpochInitDuration(1)+ ...
@@ -134,7 +148,7 @@ for n = 1:length(inputList)
                    zeros(1,length(data)- CS.StimOff(CS.swpCt,1))]';
 
                 end
-                
+
 			  ccss = types.core.CurrentClampStimulusSeries( ...
                         'electrode', ICelecLink, ...
                         'gain', NaN, ...
@@ -154,7 +168,7 @@ for n = 1:length(inputList)
                         'bridge_balance', CS.brigBal/(1e6), ... % Unit: MOhm
                         'capacitance_compensation', CS.capComp*1e12, ... % Unit: pFarad
                         'data', data(:,1,s), ...
-                        'data_unit', aquiPara.recChUnits{:}, ...
+                        'data_unit', aquiPara.recChUnits{1}, ...
                         'electrode', ICelecLink, ...
                         'stimulus_description', stimDescrp, ...   
                         'sweep_number', uint64(CS.swpCt),...
@@ -167,6 +181,7 @@ for n = 1:length(inputList)
                 CS.sweep_series_objects_ch1 = [CS.sweep_series_objects_ch1, sweep_ch1]; 
                 CS.sweep_series_objects_ch2 = [CS.sweep_series_objects_ch2, sweep_ch2];
                 CS.swpCt =  CS.swpCt + 1;   
+             
           end
        end
         count = count +1;

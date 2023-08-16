@@ -307,7 +307,7 @@ if h.fFileVersionNumber>=2
   end
   % this is a hack: determine where either of strings 'clampex',
   % 'clampfit', 'axoscope' or patchxpress' begin
-  progString={'clampex','clampfit','axoscope','patchxpress'};
+  progString={'clampex'} %,'clampfit','axoscope','patchxpress'};
   goodstart=[];
   for i=1:numel(progString)
     goodstart=cat(1,goodstart,strfind(lower(char(BigString)'),progString{i}));
