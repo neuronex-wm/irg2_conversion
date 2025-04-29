@@ -1,6 +1,6 @@
 function [nwb,ic_elec,ICelecLink] = addRunElec2NWB(nwb, CS, T)
- 
-if any(strcmp('Temperature',T.Properties.VariableNames))
+
+if any(strcmp('Temperature',T.Properties.VariableNames)) && ~isempty(T.Temperature(CS.CompDataIdx))
     Temperature = num2str(T.Temperature(CS.CompDataIdx));
 else
     Temperature = 'not documented';

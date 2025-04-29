@@ -9,7 +9,11 @@ if ~isempty(CS.CompDataIdx)
     'weight', num2str(T.Weight_Kg(CS.CompDataIdx))     ... 
      );      
    CS.corticalArea = T.TissueOrigin(CS.CompDataIdx);
-   CS.initAccessResistance = num2str(T.InitialAccessResistance(CS.CompDataIdx));
+   if ~isempty(T.InitialAccessResistance(CS.CompDataIdx))
+    CS.initAccessResistance = num2str(T.InitialAccessResistance(CS.CompDataIdx));
+   else
+     CS.initAccessResistance =  {'NA'};
+   end
 else    
     disp('Manual entry data not found')
     CS.noManuTag = 1;
