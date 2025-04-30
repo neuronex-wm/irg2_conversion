@@ -1,4 +1,4 @@
-function f = NHP_ID_conversion(input)
+function f = NHP_ID_conversion_Western(input)
       if contains(input,'M12')
           str = ['42', sprintf('%d', ...
           double(input(5:6))), input(12:13), '00'];                        % There is a Monkey A12 and M12
