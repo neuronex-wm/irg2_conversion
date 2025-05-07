@@ -1,7 +1,10 @@
 function f = NHP_ID_conversion_Western(input)
-      if contains(input,'M12')
-          str = ['42', sprintf('%d', ...
-          double(input(5:6))), input(12:13), '00'];                        % There is a Monkey A12 and M12
+      if contains(input,'M16')
+          str = ['00', sprintf('%d', ...
+          double(input(5:6))), input(12:13), '00'];                        % There is a Monkey A16 and M16
+      elseif contains(input,'M17')
+          str = ['01', sprintf('%d', ...
+          double(input(5:6))), input(12:13), '00'];                        % There is a Monkey A17 and M17
       else
           str = [input(2:3), sprintf('%d', ...
               double(input(5:6))), input(12:13), '00'];                    % creates a string from monkey number, experimenter initals and cell number like 02JS07 and adds '00' as lab ID number at the end

@@ -34,12 +34,12 @@ for n = 1:length(inputList)
     nwb.general_lab = 'Martinez-Trujillo/Inoue';  
     nwb.general_devices.set('Amplifier', ...
           types.core.Device('description', 'Axon MultiClamp 700B', ...
-                                     'manufacturer', 'Molecular Devices'));                          
+                            'manufacturer', 'Molecular Devices'));                          
     nwb.general_devices.set('Digitizer', ...
          types.core.Device('description', 'Axon Digidata 1440 or 1550', ...
                                      'manufacturer', 'Molecular Devices'));                               
     nwb.general_slices = ...
-          'ACSF slightly different to NeuroNex better description follows';                   
+          '300 micron thick slices perfused in ACSF with synaptic blockers';                   
     [nwb, CS] = addSubAna2NWB(nwb, T, CS);   
     if CS.noManuTag==0 && cell2mat(T.SlicingSolution(CS.CompDataIdx))=="Choline"
        nwb.general_surgery = 'Bioopsies; Anaesthesia; choline-based slicing solution';     
@@ -190,7 +190,7 @@ for n = 1:length(inputList)
     end        
 %% Intracellular Recordings Table  
    nwb = makeICtab(nwb, CS, ic_elec);
-   filename = fullfile([outputfolder, '/' ,nwb.identifier '.nwb']);
+   filename = fullfile([outputfolder, '/' ,inputList(n).name '.nwb']);
    nwbExport(nwb, filename);
 end
    

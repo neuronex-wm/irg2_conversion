@@ -15,7 +15,11 @@ ic_elec = types.core.IntracellularElectrode( ...
            'slice', ['Temperature ',Temperature ],...
            'cell_id', num2str(nwb.identifier)...
         );
-nwb.general_intracellular_ephys.set(CS.ic_elec_name, ic_elec);
+if string(CS.ic_elec_name)=="unknown"
+ nwb.general_intracellular_ephys.set('UnknownElectrode', ic_elec);
+else
+ nwb.general_intracellular_ephys.set(CS.ic_elec_name, ic_elec);
+end
 ICelecLink = types.untyped.SoftLink(['/general/intracellular_ephys/' CS.ic_elec_name]); 
 
 end
